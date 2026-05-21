@@ -1,0 +1,36 @@
+name: CI/CD workflow
+run-name: Triggered by @${{ github.actor }}
+on:
+  pull_request:
+    types: [opened, reopened]
+    branches:
+      - 'main'
+  push:
+      branches:
+        - 'main'
+        
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Run tests
+        run: go test -v ./...
