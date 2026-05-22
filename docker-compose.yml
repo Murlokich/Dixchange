@@ -5,6 +5,6 @@ services:
     environment:
       POSTGRES_PASSWORD: password
       POSTGRES_USER: developer
-      POSTGRES_DB: auth
+      POSTGRES_DB: monolith
     ports:
       - "5432:5432"

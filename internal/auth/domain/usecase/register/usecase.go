@@ -1,9 +1,8 @@
 package register
 
 type UseCase struct {
-
 }
 
-func (u *UseCase) Execute(input Input) (Output, Error) {
-	return nil 
+func (u *UseCase) Execute(input Input) (Output, error) {
+	return Output{}, nil
 }
