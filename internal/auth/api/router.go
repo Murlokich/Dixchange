@@ -7,6 +7,6 @@ import (
 func RegisterEndpoints(router *gin.RouterGroup) {
 	authRouter := router.Group("auth")
 
-	authRouter.POST("/login")
-	authRouter.POST("/register")
+	authRouter.POST("/login", loginHandler)
+	authRouter.POST("/register", registerHandler)
 }
