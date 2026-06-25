@@ -1,6 +1,6 @@
 package login
 
 type Input struct {
-	Email string 
+	Email    string
 	Password string
 }

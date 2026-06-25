@@ -3,6 +3,6 @@ package login
 type UseCase struct {
 }
 
-func (u *UseCase) Execute(input Input) (Output, error) {
+func (u *UseCase) Execute(_ Input) (Output, error) {
 	return Output{}, nil
 }

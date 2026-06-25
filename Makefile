@@ -13,6 +13,9 @@ test: ## Run tests and display coverage
 	@go tool cover -func=coverage.out
 	@rm -f coverage.out
 
+gen: ## Generate code: sqlc
+	@sqlc generate
+
 lint: ## Run linters
 	@golangci-lint run -v --timeout=5m ./...
 
