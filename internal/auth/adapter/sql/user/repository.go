@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 
 	"github.com/dixchange/Monolith/internal/auth/domain/entity"
@@ -32,8 +33,12 @@ func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entity.User, error) {
 	const errWrapMessage = "user repository GetUserByEmail"
+
 	user, err := r.q.GetUserByEmail(ctx, email)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.User{}, errors.Wrap(entity.ErrNoUserFound, errWrapMessage)
+		}
 		return entity.User{}, errors.Wrap(err, errWrapMessage)
 	}
 	return entity.User{

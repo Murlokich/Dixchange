@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
+	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
 	"github.com/dixchange/Monolith/internal/auth/adapter/sql/user"
 	authAPI "github.com/dixchange/Monolith/internal/auth/controller/http"
+	"github.com/dixchange/Monolith/internal/auth/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/auth/domain/usecase/register"
 	"github.com/dixchange/Monolith/internal/config"
 
@@ -73,9 +75,15 @@ func main() {
 
 	userRepo := user.NewRepository(postgresPool)
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
+	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
+	if err != nil {
+		log.Errorf("create new manager: %v", err)
+		return
+	}
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher)
-	authDeps := authAPI.NewAuthDependencies(regUseCase)
+	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
+	authDeps := authAPI.NewAuthDependencies(regUseCase, logUseCase, log)
 
 	router := gin.Default()
 

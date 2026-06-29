@@ -3,13 +3,21 @@ package http
 import (
 	"github.com/gin-gonic/gin"
 
+	"github.com/dixchange/Monolith/internal/auth/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/auth/domain/usecase/register"
 )
 
 type AuthHandler func(c *gin.Context, deps *AuthDependencies)
 
+type Logger interface {
+	Infof(string, ...any)
+	Errorf(string, ...any)
+}
+
 type AuthDependencies struct {
-	reg *register.UseCase
+	logger Logger
+	reg    *register.UseCase
+	log    *login.UseCase
 }
 
 func (d *AuthDependencies) WrapHandler(handler AuthHandler) gin.HandlerFunc {
@@ -18,8 +26,10 @@ func (d *AuthDependencies) WrapHandler(handler AuthHandler) gin.HandlerFunc {
 	}
 }
 
-func NewAuthDependencies(reg *register.UseCase) *AuthDependencies {
+func NewAuthDependencies(reg *register.UseCase, log *login.UseCase, logger Logger) *AuthDependencies {
 	return &AuthDependencies{
-		reg: reg,
+		reg:    reg,
+		log:    log,
+		logger: logger,
 	}
 }
