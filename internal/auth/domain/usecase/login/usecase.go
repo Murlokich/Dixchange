@@ -1,0 +1,61 @@
+package login
+
+import (
+	"context"
+
+	"github.com/dixchange/Monolith/internal/auth/domain/entity"
+
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+)
+
+type Repository interface {
+	GetUserByEmail(ctx context.Context, email string) (entity.User, error)
+}
+
+type PasswordHasher interface {
+	ComparePasswords(password string, passwordHash string) (bool, error)
+}
+
+type JWTIssuer interface {
+	IssueToken(userID uuid.UUID) (string, error)
+}
+
+type UseCase struct {
+	repo      Repository
+	pwdHasher PasswordHasher
+	jwtIssuer JWTIssuer
+}
+
+// TODO: for now - assign single long term access token
+// make normal authentication with refresh token, revocation, etc.
+func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
+	const errWrapMessage = "login usecase Execute"
+	user, err := u.repo.GetUserByEmail(ctx, input.Email)
+	if err != nil {
+		if errors.Is(err, entity.ErrNoUserFound) {
+			return Output{}, errors.Wrap(ErrInvalidCredentials, errWrapMessage)
+		}
+		return Output{}, errors.Wrap(err, errWrapMessage)
+	}
+	match, err := u.pwdHasher.ComparePasswords(input.Password, user.PasswordHash)
+	if err != nil {
+		return Output{}, errors.Wrap(err, errWrapMessage)
+	}
+	if !match {
+		return Output{}, errors.Wrap(ErrInvalidCredentials, errWrapMessage)
+	}
+	token, err := u.jwtIssuer.IssueToken(user.ID)
+	if err != nil {
+		return Output{}, errors.Wrap(err, errWrapMessage)
+	}
+	return Output{AccessToken: token}, nil
+}
+
+func NewUseCase(repo Repository, pwdHasher PasswordHasher, jwtIssuer JWTIssuer) *UseCase {
+	return &UseCase{
+		repo:      repo,
+		pwdHasher: pwdHasher,
+		jwtIssuer: jwtIssuer,
+	}
+}
