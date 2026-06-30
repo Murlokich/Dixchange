@@ -24,7 +24,7 @@ type Manager struct {
 }
 
 func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
-	const errWrapMessage = "jwt issuer IssueToken"
+	const errWrapMessage = "jwt manager IssueToken"
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", errors.Wrap(err, errWrapMessage)
@@ -42,6 +42,22 @@ func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(&m.privateKey)
 	if err != nil {
 		return "", errors.Wrap(err, errWrapMessage)
+	}
+	return token, nil
+}
+
+func (m *Manager) ValidateToken(accessToken string) (*jwt.Token, error) {
+	const errWrapMessage = "jwt manager ValidateToken"
+
+	parser := jwt.NewParser()
+
+	// return manager's public key to validate token
+	getKey := func(*jwt.Token) (any, error) {
+		return m.publicKey, nil
+	}
+	token, err := parser.Parse(accessToken, getKey)
+	if err != nil {
+		return nil, errors.Wrap(err, errWrapMessage)
 	}
 	return token, nil
 }
