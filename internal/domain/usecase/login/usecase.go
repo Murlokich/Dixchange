@@ -3,7 +3,7 @@ package login
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/auth/domain/entity"
+	"github.com/dixchange/Monolith/internal/domain/entity"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -31,6 +31,7 @@ type UseCase struct {
 // make normal authentication with refresh token, revocation, etc.
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	const errWrapMessage = "login usecase Execute"
+
 	user, err := u.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, entity.ErrNoUserFound) {

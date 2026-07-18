@@ -10,15 +10,18 @@ import (
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
 	"github.com/dixchange/Monolith/internal/auth/adapter/sql/user"
-	authAPI "github.com/dixchange/Monolith/internal/auth/controller/http"
-	"github.com/dixchange/Monolith/internal/auth/domain/usecase/login"
-	"github.com/dixchange/Monolith/internal/auth/domain/usecase/register"
+	"github.com/dixchange/Monolith/internal/balance/adapter/sql/wallet"
 	"github.com/dixchange/Monolith/internal/config"
+	api "github.com/dixchange/Monolith/internal/controller/http"
+	"github.com/dixchange/Monolith/internal/domain/usecase/login"
+	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	shopspringDecimal "github.com/jackc/pgx-shopspring-decimal"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -48,6 +51,25 @@ func runMigrations(dbConfig *config.DBConfig) error {
 	return nil
 }
 
+func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	const errWrapMessage = "cmd setupPostgres setupPostgres"
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, errWrapMessage)
+	}
+	// Registers shopspringDecimal adapter to convert Numeric(15, 6) into decimal.Decimal
+	// used in domain/entity. Runtime parser for pgx
+	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
+		shopspringDecimal.Register(conn.TypeMap())
+		return nil
+	}
+	pgxPool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, errWrapMessage)
+	}
+	return pgxPool, nil
+}
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -66,7 +88,7 @@ func main() {
 		return
 	}
 
-	postgresPool, err := pgxpool.New(ctx, cfg.DBConfig.URL)
+	postgresPool, err := setupPostgres(ctx, cfg.DBConfig.URL)
 	if err != nil {
 		log.Errorf("connect to db: %v", err)
 		return
@@ -74,6 +96,7 @@ func main() {
 	defer postgresPool.Close()
 
 	userRepo := user.NewRepository(postgresPool)
+	balanceRepo := wallet.NewRepository(postgresPool)
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
 	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
 	if err != nil {
@@ -81,9 +104,14 @@ func main() {
 		return
 	}
 
-	regUseCase := register.NewUseCase(userRepo, pwdHasher)
+	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
-	authDeps := authAPI.NewAuthDependencies(regUseCase, logUseCase, log)
+
+	deps := api.Dependencies{
+		Logger:   log,
+		Register: regUseCase,
+		Login:    logUseCase,
+	}
 
 	router := gin.Default()
 
@@ -93,7 +121,7 @@ func main() {
 
 	apiRouter := router.Group("api")
 
-	authAPI.RegisterEndpoints(apiRouter, authDeps)
+	api.RegisterEndpoints(apiRouter, &deps)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPConfig.Addr,

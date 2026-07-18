@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterEndpoints(router *gin.RouterGroup, d *AuthDependencies) {
+func RegisterEndpoints(router *gin.RouterGroup, d *Dependencies) {
 	authRouter := router.Group("auth")
 
 	authRouter.POST("/login", d.WrapHandler(loginHandler))

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dixchange/Monolith/internal/auth/domain/usecase/register"
+	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 )
 
 const (

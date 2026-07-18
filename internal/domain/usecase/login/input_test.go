@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dixchange/Monolith/internal/auth/domain/usecase/login"
+	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 )
 
 const (
@@ -64,7 +64,7 @@ func TestInput_Validate_Email(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			input := login.Input{Email: tc.Email, Password: ValidPassword}
+			input := register.Input{Email: tc.Email, Password: ValidPassword}
 			err := input.Validate(t.Context())
 			if tc.IsValid {
 				require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestInput_Validate_Password(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			input := login.Input{Email: ValidEmail, Password: tc.Password}
+			input := register.Input{Email: ValidEmail, Password: tc.Password}
 			err := input.Validate(t.Context())
 			if tc.IsValid {
 				require.NoError(t, err)
