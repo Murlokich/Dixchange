@@ -36,17 +36,3 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (AuthUser, e
 	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
 	return i, err
 }
-
-const isEmailTaken = `-- name: IsEmailTaken :one
-SELECT EXISTS (
-    SELECT 1 FROM auth.user
-    WHERE email = $1
-)
-`
-
-func (q *Queries) IsEmailTaken(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRow(ctx, isEmailTaken, email)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}

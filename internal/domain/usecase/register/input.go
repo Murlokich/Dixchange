@@ -1,10 +1,10 @@
-package login
+package register
 
 import (
 	"context"
 	"regexp"
 
-	"github.com/dixchange/Monolith/internal/auth/domain/entity"
+	"github.com/dixchange/Monolith/internal/domain/entity"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/pkg/errors"

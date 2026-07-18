@@ -3,29 +3,38 @@ package user
 import (
 	"context"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pkg/errors"
 
-	"github.com/dixchange/Monolith/internal/auth/domain/entity"
+	"github.com/dixchange/Monolith/internal/domain/entity"
+)
+
+const (
+	emailColumnName = "email"
+)
+
+var (
+	ErrEmailIsAlreadyUsed = errors.New("email is already used")
 )
 
 type Repository struct {
 	q *Queries
 }
 
-func (r *Repository) IsEmailTaken(ctx context.Context, email string) (bool, error) {
-	const errWrapMessage = "user repository IsEmailTaken"
-	res, err := r.q.IsEmailTaken(ctx, email)
-	return res, errors.Wrap(err, errWrapMessage)
-}
-
 func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 	const errWrapMessage = "user repository CreateUser"
+
 	if err := r.q.CreateUser(ctx, CreateUserParams{
 		ID:           user.ID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 	}); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation && pgErr.ColumnName == emailColumnName {
+			return errors.Wrap(ErrEmailIsAlreadyUsed, errWrapMessage)
+		}
 		return errors.Wrap(err, errWrapMessage)
 	}
 	return nil
