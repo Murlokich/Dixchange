@@ -20,10 +20,15 @@ type BalanceRepository interface {
 	CreateBalanceRecord(ctx context.Context, userID uuid.UUID) error
 }
 
+type TXManager interface {
+	WithTX(ctx context.Context, fn func(ctx context.Context) error) (err error)
+}
+
 type UseCase struct {
 	userRepo    UserRepository
 	pwdHasher   PasswordHasher
 	balanceRepo BalanceRepository
+	txManager   TXManager
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -37,11 +42,20 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	if err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
-	if err = u.userRepo.CreateUser(ctx, user); err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+
+	fn := func(ctx context.Context) error {
+		if err = u.userRepo.CreateUser(ctx, user); err != nil {
+			return errors.Wrap(err, errWrapMessage)
+		}
+
+		if err = u.balanceRepo.CreateBalanceRecord(ctx, user.ID); err != nil {
+			return errors.Wrap(err, errWrapMessage)
+		}
+
+		return nil
 	}
 
-	if err = u.balanceRepo.CreateBalanceRecord(ctx, user.ID); err != nil {
+	if err = u.txManager.WithTX(ctx, fn); err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 
@@ -66,10 +80,16 @@ func (u *UseCase) inputToUser(input Input) (entity.User, error) {
 	}, nil
 }
 
-func NewUseCase(userRepo UserRepository, pwdHasher PasswordHasher, balanceRepo BalanceRepository) *UseCase {
+func NewUseCase(
+	userRepo UserRepository,
+	pwdHasher PasswordHasher,
+	balanceRepo BalanceRepository,
+	txManager TXManager,
+) *UseCase {
 	return &UseCase{
 		userRepo:    userRepo,
 		pwdHasher:   pwdHasher,
 		balanceRepo: balanceRepo,
+		txManager:   txManager,
 	}
 }

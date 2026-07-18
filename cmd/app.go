@@ -15,6 +15,7 @@ import (
 	api "github.com/dixchange/Monolith/internal/controller/http"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	"github.com/dixchange/Monolith/pkg"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-migrate/migrate/v4"
@@ -95,16 +96,17 @@ func main() {
 	}
 	defer postgresPool.Close()
 
-	userRepo := user.NewRepository(postgresPool)
-	balanceRepo := wallet.NewRepository(postgresPool)
+	userRepo := user.NewRepository(postgresPool, pkg.GetDB)
+	balanceRepo := wallet.NewRepository(postgresPool, pkg.GetDB)
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
+	txManager := pkg.NewTXManager(postgresPool)
 	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
 	if err != nil {
 		log.Errorf("create new manager: %v", err)
 		return
 	}
 
-	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo)
+	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 
 	deps := api.Dependencies{

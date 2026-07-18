@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/dixchange/Monolith/pkg"
 )
 
 const (
@@ -20,13 +21,17 @@ var (
 )
 
 type Repository struct {
-	q *Queries
+	db       DBTX
+	txGetter pkg.TXGetter
 }
 
 func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 	const errWrapMessage = "user repository CreateUser"
 
-	if err := r.q.CreateUser(ctx, CreateUserParams{
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	if err := q.CreateUser(ctx, CreateUserParams{
 		ID:           user.ID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
@@ -43,7 +48,10 @@ func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entity.User, error) {
 	const errWrapMessage = "user repository GetUserByEmail"
 
-	user, err := r.q.GetUserByEmail(ctx, email)
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	user, err := q.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return entity.User{}, errors.Wrap(entity.ErrNoUserFound, errWrapMessage)
@@ -57,6 +65,6 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entity.U
 	}, nil
 }
 
-func NewRepository(db DBTX) *Repository {
-	return &Repository{q: New(db)}
+func NewRepository(db DBTX, txGetter pkg.TXGetter) *Repository {
+	return &Repository{db: db, txGetter: txGetter}
 }

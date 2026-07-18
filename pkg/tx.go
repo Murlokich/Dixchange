@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Used to unite Pool, Connection and Transaction.
 type DBTX interface {
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
@@ -18,6 +19,7 @@ type DBTX interface {
 
 type Beginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
 	DBTX
 }
 
@@ -34,7 +36,9 @@ func (tm *TXManager) WithTX(ctx context.Context, fn func(ctx context.Context) er
 	}
 	ctx = context.WithValue(ctx, txKey{}, tx)
 
+	// Call before the fn execution to recover from panic.
 	defer func() {
+		// Must process panic to prevent transaction from not being finished.
 		if p := recover(); p != nil {
 			err = fmt.Errorf("recovered from panic: %v", p)
 		}
@@ -59,11 +63,18 @@ func (tm *TXManager) WithTX(ctx context.Context, fn func(ctx context.Context) er
 	return nil
 }
 
-type TXGetter func(ctx context.Context, db Beginner) DBTX
+// Use this type in repos to extract transaction from the context.
+type TXGetter func(ctx context.Context, db DBTX) DBTX
 
-func GetDB(ctx context.Context, db Beginner) DBTX {
+func GetDB(ctx context.Context, db DBTX) DBTX {
 	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return tx
 	}
 	return db
+}
+
+func NewTXManager(db Beginner) *TXManager {
+	return &TXManager{
+		db: db,
+	}
 }

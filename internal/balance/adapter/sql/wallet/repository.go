@@ -3,19 +3,24 @@ package wallet
 import (
 	"context"
 
+	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 )
 
 type Repository struct {
-	q *Queries
+	db       DBTX
+	txGetter pkg.TXGetter
 }
 
 func (r *Repository) CreateBalanceRecord(ctx context.Context, userID uuid.UUID) error {
 	const errWrapMessage = "main repository CreateBalanceRecord"
 
-	if err := r.q.CreateBalanceRecord(ctx, userID); err != nil {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	if err := q.CreateBalanceRecord(ctx, userID); err != nil {
 		return errors.Wrap(err, errWrapMessage)
 	}
 
@@ -25,7 +30,10 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, userID uuid.UUID) 
 func (r *Repository) DepositUSD(ctx context.Context, userID uuid.UUID, amount decimal.Decimal) error {
 	const errWrapMessage = "main Repository DepositUSD"
 
-	if err := r.q.DepositUSD(ctx, DepositUSDParams{
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	if err := q.DepositUSD(ctx, DepositUSDParams{
 		Usd:    amount,
 		UserID: userID,
 	}); err != nil {
@@ -34,6 +42,6 @@ func (r *Repository) DepositUSD(ctx context.Context, userID uuid.UUID, amount de
 	return nil
 }
 
-func NewRepository(db DBTX) *Repository {
-	return &Repository{q: New(db)}
+func NewRepository(db DBTX, txGetter pkg.TXGetter) *Repository {
+	return &Repository{db: db, txGetter: txGetter}
 }
