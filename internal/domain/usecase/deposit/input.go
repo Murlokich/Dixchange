@@ -2,7 +2,7 @@ package deposit
 
 import (
 	"github.com/google/uuid"
-	decimal "github.com/jackc/pgx-shopspring-decimal"
+	"github.com/shopspring/decimal"
 )
 
 type Input struct {

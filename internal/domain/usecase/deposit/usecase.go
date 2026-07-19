@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	decimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/pkg/errors"
+	"github.com/shopspring/decimal"
 )
 
 type Repository interface {
@@ -23,4 +23,8 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 	return Output{}, nil
+}
+
+func NewUseCase(repo Repository) *UseCase {
+	return &UseCase{repo: repo}
 }

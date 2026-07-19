@@ -1,5 +1,7 @@
 package http
 
+import "github.com/shopspring/decimal"
+
 type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=8,max=256"`
 	Email    string `json:"email" binding:"required,min=6,max=254"`
@@ -8,4 +10,8 @@ type LoginRequest struct {
 type RegisterRequest struct {
 	Password string `json:"password" binding:"required,min=8,max=256"`
 	Email    string `json:"email" binding:"required,min=6,max=254"`
+}
+
+type DepositRequest struct {
+	Amount decimal.Decimal `json:"amount" binding:"required"`
 }

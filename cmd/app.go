@@ -13,6 +13,7 @@ import (
 	"github.com/dixchange/Monolith/internal/balance/adapter/sql/wallet"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
+	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	"github.com/dixchange/Monolith/pkg"
@@ -108,11 +109,13 @@ func main() {
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
+	depositUseCase := deposit.NewUseCase(balanceRepo)
 
 	deps := api.Dependencies{
 		Logger:   log,
 		Register: regUseCase,
 		Login:    logUseCase,
+		Deposit:  depositUseCase,
 	}
 
 	router := gin.Default()
