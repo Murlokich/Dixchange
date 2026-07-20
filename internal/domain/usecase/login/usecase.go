@@ -32,6 +32,10 @@ type UseCase struct {
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	const errWrapMessage = "login usecase Execute"
 
+	if err := input.Validate(ctx); err != nil {
+		return Output{}, errors.Wrap(err, errWrapMessage)
+	}
+
 	user, err := u.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, entity.ErrNoUserFound) {

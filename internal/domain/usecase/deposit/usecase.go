@@ -19,6 +19,10 @@ type UseCase struct {
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	const errWrapMessage = "deposit UseCase Execute"
 
+	if err := input.Validate(ctx); err != nil {
+		return Output{}, errors.Wrap(err, errWrapMessage)
+	}
+
 	if err := u.repo.DepositUSD(ctx, input.UserID, input.USDAmount); err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
