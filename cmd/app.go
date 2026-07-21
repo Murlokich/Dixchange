@@ -112,10 +112,11 @@ func main() {
 	depositUseCase := deposit.NewUseCase(balanceRepo)
 
 	deps := api.Dependencies{
-		Logger:   log,
-		Register: regUseCase,
-		Login:    logUseCase,
-		Deposit:  depositUseCase,
+		Logger:         log,
+		TokenValidator: jwtManager,
+		Register:       regUseCase,
+		Login:          logUseCase,
+		Deposit:        depositUseCase,
 	}
 
 	router := gin.Default()

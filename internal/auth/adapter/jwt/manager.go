@@ -34,7 +34,7 @@ func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
 		Issuer:    m.issuer,
 		Subject:   userID.String(),
 		Audience:  jwt.ClaimStrings{m.audience},
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenValidityPeriod)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenValidityPeriod * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ID:        id.String(),
 	}
@@ -53,7 +53,7 @@ func (m *Manager) ValidateToken(accessToken string) (*jwt.Token, error) {
 
 	// return manager's public key to validate token
 	getKey := func(*jwt.Token) (any, error) {
-		return m.publicKey, nil
+		return &m.publicKey, nil
 	}
 	token, err := parser.Parse(accessToken, getKey)
 	if err != nil {

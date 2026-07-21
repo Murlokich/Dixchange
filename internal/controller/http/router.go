@@ -10,5 +10,5 @@ func RegisterEndpoints(router *gin.RouterGroup, d *Dependencies) {
 	authRouter.POST("/register", d.WrapHandler(registerHandler))
 
 	balanceRouter := router.Group("balance")
-	balanceRouter.POST("/:user_id/deposit", d.WrapHandler(depositHandler))
+	balanceRouter.POST("/:user_id/deposit", d.WrapHandler(authMiddleware), d.WrapHandler(depositHandler))
 }

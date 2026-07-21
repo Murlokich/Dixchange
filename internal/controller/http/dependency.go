@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
@@ -15,8 +16,13 @@ type Logger interface {
 	Errorf(string, ...any)
 }
 
+type TokenValidator interface {
+	ValidateToken(accessToken string) (*jwt.Token, error)
+}
+
 type Dependencies struct {
-	Logger Logger
+	Logger         Logger
+	TokenValidator TokenValidator
 
 	Register *register.UseCase
 	Login    *login.UseCase
