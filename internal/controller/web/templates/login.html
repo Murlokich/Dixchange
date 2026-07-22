@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: rgba(17, 24, 39, 0.86);
+      --panel-border: rgba(148, 163, 184, 0.18);
+      --text: #e5eefc;
+      --muted: #9aa7bd;
+      --accent: #4f8cff;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(79, 140, 255, 0.22), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.16), transparent 32%),
+        linear-gradient(160deg, #08101d 0%, #0b1020 48%, #0f172a 100%);
+      padding: 24px;
+    }
+
+    .card {
+      width: min(100%, 420px);
+      padding: 32px;
+      border-radius: 24px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.72);
+      color: var(--text);
+      padding: 14px 48px 14px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus {
+      border-color: rgba(79, 140, 255, 0.95);
+      box-shadow: 0 0 0 4px rgba(79, 140, 255, 0.18);
+    }
+
+    .toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .toggle:hover { color: var(--text); }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent) 0%, #2f6fff 100%);
+      color: white;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    .button:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .button:disabled { cursor: wait; opacity: 0.7; transform: none; }
+
+    .status {
+      min-height: 20px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .status.error { color: var(--danger); }
+    .status.success { color: #7ee787; }
+
+    .token {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      font-size: 12px;
+      word-break: break-all;
+      color: #c7d2fe;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <p class="eyebrow">Trading Platform</p>
+    <h1>Sign in</h1>
+    <p class="subtitle">Use your account credentials to view the platform overview.</p>
+
+    <form id="login-form">
+      <div class="field">
+        <label for="email">Username or email</label>
+        <input id="email" name="email" type="text" autocomplete="username" required>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+          <button class="toggle" type="button" id="toggle-password">Show</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="button" id="submit-button" type="submit">Log in</button>
+        <div class="status" id="status"></div>
+      </div>
+
+      <div class="token" id="token-box"></div>
+    </form>
+  </main>
+
+  <script>
+    const validationMessage = 'Email or password are not following the right format';
+    const form = document.getElementById('login-form');
+    const status = document.getElementById('status');
+    const tokenBox = document.getElementById('token-box');
+    const submitButton = document.getElementById('submit-button');
+    const password = document.getElementById('password');
+    const togglePassword = document.getElementById('toggle-password');
+
+    togglePassword.addEventListener('click', () => {
+      const isHidden = password.type === 'password';
+      password.type = isHidden ? 'text' : 'password';
+      togglePassword.textContent = isHidden ? 'Hide' : 'Show';
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      status.textContent = '';
+      status.className = 'status';
+      tokenBox.style.display = 'none';
+      submitButton.disabled = true;
+      submitButton.textContent = 'Logging in...';
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email.value.trim(),
+            password: form.password.value
+          })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (response.status === 400) {
+            throw new Error(validationMessage);
+          }
+
+          if (response.status === 403) {
+            throw new Error(payload.error || 'Invalid credentials');
+          }
+
+          throw new Error(payload.error || 'Login failed');
+        }
+
+        const token = payload.accessToken || payload.AccessToken;
+        if (token) {
+          localStorage.setItem('auth_token', token);
+          tokenBox.textContent = `Access token saved locally:\n${token}`;
+          tokenBox.style.display = 'block';
+        }
+
+        status.textContent = 'Login successful.';
+        status.classList.add('success');
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add('error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Log in';
+      }
+    });
+  </script>
+</body>
+</html>

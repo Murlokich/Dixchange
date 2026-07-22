@@ -13,6 +13,7 @@ import (
 	"github.com/dixchange/Monolith/internal/balance/adapter/sql/wallet"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
+	web "github.com/dixchange/Monolith/internal/controller/web"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
@@ -120,6 +121,8 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.SetHTMLTemplate(web.Templates())
+	web.RegisterRoutes(router)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, "pong")

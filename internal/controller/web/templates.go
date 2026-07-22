@@ -1,0 +1,43 @@
+package web
+
+import (
+	"html/template"
+	"io/fs"
+	"path/filepath"
+	"sort"
+
+	"embed"
+
+	"github.com/gin-gonic/gin"
+)
+
+//go:embed templates/*.html
+var templateFiles embed.FS
+
+func Templates() *template.Template {
+	tmpl := template.New("")
+	paths, _ := fs.Glob(templateFiles, "templates/*.html")
+	sort.Strings(paths)
+	for _, path := range paths {
+		name := filepath.Base(path)
+		content, err := templateFiles.ReadFile(path)
+		if err != nil {
+			panic(err)
+		}
+		if _, err := tmpl.New(name).Parse(string(content)); err != nil {
+			panic(err)
+		}
+	}
+	return tmpl
+}
+
+func RegisterRoutes(router *gin.Engine) {
+	router.GET("/", func(c *gin.Context) {
+		c.Redirect(302, "/login")
+	})
+	router.GET("/login", func(c *gin.Context) {
+		c.HTML(200, "login.html", gin.H{
+			"Title": "Monolith Trading Platform",
+		})
+	})
+}
