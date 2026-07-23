@@ -3,6 +3,7 @@ package web
 import (
 	"html/template"
 	"io/fs"
+	"net/http"
 	"path/filepath"
 	"sort"
 
@@ -33,11 +34,26 @@ func Templates() *template.Template {
 
 func RegisterRoutes(router *gin.Engine) {
 	router.GET("/", func(c *gin.Context) {
-		c.Redirect(302, "/login")
+		if _, err := c.Cookie("access_token"); err == nil {
+			c.Redirect(http.StatusFound, "/platform")
+			return
+		}
+		c.Redirect(http.StatusFound, "/login")
 	})
 	router.GET("/login", func(c *gin.Context) {
 		c.HTML(200, "login.html", gin.H{
 			"Title": "Monolith Trading Platform",
+		})
+	})
+	router.GET("/platform", func(c *gin.Context) {
+		if _, err := c.Cookie("access_token"); err != nil {
+			c.Redirect(http.StatusFound, "/login")
+			return
+		}
+
+		c.HTML(http.StatusOK, "platform.html", gin.H{
+			"Title":          "Monolith Trading Platform",
+			"AccountInitial": "M",
 		})
 	})
 }

@@ -219,8 +219,7 @@
           throw new Error(payload.error || 'Login failed');
         }
 
-        status.textContent = 'Login successful. The session is now stored in your browser cookie.';
-        status.classList.add('success');
+        window.location.assign('/platform');
       } catch (error) {
         status.textContent = error.message;
         status.classList.add('error');
