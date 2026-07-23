@@ -25,7 +25,7 @@ func Templates() *template.Template {
 		if err != nil {
 			panic(err)
 		}
-		if _, err := tmpl.New(name).Parse(string(content)); err != nil {
+		if _, err = tmpl.New(name).Parse(string(content)); err != nil {
 			panic(err)
 		}
 	}
@@ -41,7 +41,7 @@ func RegisterRoutes(router *gin.Engine) {
 		c.Redirect(http.StatusFound, "/login")
 	})
 	router.GET("/login", func(c *gin.Context) {
-		c.HTML(200, "login.html", gin.H{
+		c.HTML(http.StatusOK, "login.html", gin.H{
 			"Title": "Monolith Trading Platform",
 		})
 	})

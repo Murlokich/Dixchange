@@ -15,18 +15,14 @@ const (
 )
 
 func setAuthCookies(c *gin.Context, accessToken string) {
-	setCookie(c, accessTokenCookieName, accessToken, sessionCookieMaxAge, true, false)
-}
-
-func setCookie(c *gin.Context, name, value string, maxAge int, httpOnly bool, secure bool) {
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     name,
-		Value:    value,
+		Name:     accessTokenCookieName,
+		Value:    accessToken,
 		Path:     sessionCookiePath,
-		MaxAge:   maxAge,
-		Expires:  time.Now().Add(time.Duration(maxAge) * time.Second),
-		HttpOnly: httpOnly,
-		Secure:   secure,
+		MaxAge:   sessionCookieMaxAge,
+		Expires:  time.Now().Add(sessionCookieMaxAge * time.Second),
+		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

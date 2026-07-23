@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	tokenValidityPeriod = time.Duration(24 * 7)
+	tokenValidityPeriod = 24 * 7
 )
 
 type Manager struct {
