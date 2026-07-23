@@ -10,7 +10,7 @@ import (
 const (
 	accessTokenCookieName = "access_token"
 
-	sessionCookiePath  = "/"
+	sessionCookiePath   = "/"
 	sessionCookieMaxAge = 7 * 24 * 60 * 60
 )
 
