@@ -15,7 +15,7 @@ const (
 )
 
 func authMiddleware(c *gin.Context, deps *Dependencies) {
-	tokenStr, ok := extractBearerToken(c)
+	tokenStr, ok := extractAccessToken(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{errorField: missingTokenResponseMessage})
 		// TODO: add user id into logger as a field
@@ -30,12 +30,18 @@ func authMiddleware(c *gin.Context, deps *Dependencies) {
 		c.Abort()
 		return
 	}
+	c.Next()
 }
 
-func extractBearerToken(c *gin.Context) (string, bool) {
-	authHeader := c.GetHeader("Authorization")
-	if !strings.HasPrefix(authHeader, bearerPrefix) {
+func extractAccessToken(c *gin.Context) (string, bool) {
+	requestAuthHeader := c.GetHeader(authHeader)
+	if strings.HasPrefix(requestAuthHeader, bearerPrefix) {
+		return strings.TrimPrefix(requestAuthHeader, bearerPrefix), true
+	}
+
+	tokenCookie, err := c.Cookie(accessTokenCookieName)
+	if err != nil || tokenCookie == "" {
 		return "", false
 	}
-	return strings.TrimPrefix(authHeader, bearerPrefix), true
+	return tokenCookie, true
 }

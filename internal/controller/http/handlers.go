@@ -23,6 +23,7 @@ const (
 	errorField = "error"
 
 	userIDParamKey = "user_id"
+	loginOKField   = "ok"
 )
 
 func loginHandler(c *gin.Context, deps *Dependencies) {
@@ -55,7 +56,8 @@ func loginHandler(c *gin.Context, deps *Dependencies) {
 		deps.Logger.Errorf(err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, LoginResponse{AccessToken: output.AccessToken})
+	setAuthCookies(c, output.AccessToken)
+	c.JSON(http.StatusOK, gin.H{loginOKField: true})
 }
 
 func registerHandler(c *gin.Context, deps *Dependencies) {
