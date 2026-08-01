@@ -51,4 +51,4 @@ That design keeps the rest of the app stable when the backend transport changes.
 
 ## Current iteration status
 
-This first iteration only establishes the foundation. It intentionally does not include trading flows, data fetching, or realtime transport code yet.
+This iteration adds a login page design only. It intentionally does not include endpoint wiring, auth logic, or contract handling yet.

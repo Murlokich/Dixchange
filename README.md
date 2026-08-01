@@ -8,6 +8,12 @@ The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation
 
 - Node.js 24
 
+## Current screen
+
+- Login page design with email and password fields.
+- Primary sign in action and secondary sign up action.
+- No backend wiring yet; this is UI only until you provide endpoints and contracts.
+
 ## Stack
 
 - Vite for fast local development and production builds.
@@ -31,4 +37,4 @@ The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation
 
 ## Next step
 
-The next iteration should add the realtime client abstraction so market feeds can plug in cleanly.
+The next iteration should wire the login form to your backend contract.

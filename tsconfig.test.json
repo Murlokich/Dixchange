@@ -17,10 +17,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["vitest/globals", "node"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }
