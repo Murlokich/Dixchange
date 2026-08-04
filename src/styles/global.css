@@ -242,6 +242,14 @@ h1 {
   text-align: center;
 }
 
+.form-note.error {
+  color: #ffb3c1;
+}
+
+.form-note.success {
+  color: #8ff0ff;
+}
+
 .lede {
   max-width: 68ch;
   margin-bottom: 28px;

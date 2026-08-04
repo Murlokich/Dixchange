@@ -8,11 +8,16 @@ The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation
 
 - Node.js 24
 
+## Backend host
+
+- Set the backend host in [envs/.env](envs/.env).
+- The app reads `VITE_BACKEND_HOST` from that file and uses it for the sign-up POST request.
+
 ## Current screen
 
 - Login page design with email and password fields.
 - Primary sign in action and secondary sign up action.
-- No backend wiring yet; this is UI only until you provide endpoints and contracts.
+- Sign up now posts to `POST /api/auth/register` on the configured backend host.
 
 ## Stack
 

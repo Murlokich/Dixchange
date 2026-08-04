@@ -51,4 +51,4 @@ That design keeps the rest of the app stable when the backend transport changes.
 
 ## Current iteration status
 
-This iteration adds a login page design only. It intentionally does not include endpoint wiring, auth logic, or contract handling yet.
+This iteration adds a login page design plus a sign-up POST request wired to the backend host from `envs/.env`. It intentionally does not include sign-in endpoint wiring, auth logic, or contract handling yet.
