@@ -280,3 +280,298 @@ h1 {
     font-size: 2.5rem;
   }
 }
+
+.dashboard-page {
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(13, 23, 41, 0.96), rgba(8, 15, 28, 0.94));
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #04111a;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.balance-panel {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.balance-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 84px;
+}
+
+.balance-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.balance-value {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.deposit-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 240, 255, 0.18);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.deposit-button:hover {
+  transform: translateY(-1px);
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.account-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(103, 215, 255, 0.16);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.account-email {
+  font-size: 0.86rem;
+  color: var(--text);
+}
+
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.stat-tile {
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(13, 23, 41, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.stat-value.positive {
+  color: #8ff0ff;
+}
+
+.stat-value.negative {
+  color: #ffb3c1;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr;
+  grid-template-areas: 'orders create' 'history history';
+  gap: 20px;
+}
+
+.panel-orders {
+  grid-area: orders;
+}
+
+.panel-create {
+  grid-area: create;
+}
+
+.panel-history {
+  grid-area: history;
+}
+
+.panel {
+  padding: 20px 22px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(13, 23, 41, 0.72);
+}
+
+.panel h2 {
+  font-size: 1.02rem;
+  margin-bottom: 14px;
+}
+
+.orders-table,
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.orders-table th,
+.history-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.orders-table td,
+.history-table td {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  text-transform: capitalize;
+}
+
+.side-buy {
+  color: #8ff0ff;
+}
+
+.side-sell {
+  color: #ffb3c1;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 12px 0;
+}
+
+.create-order-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-order-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.create-order-menu {
+  position: absolute;
+  top: 100%;
+  left: 22px;
+  right: 22px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(8, 15, 28, 0.98);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+  z-index: 2;
+}
+
+.create-order-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.create-order-menu button:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'orders' 'create' 'history';
+  }
+
+  .dashboard-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-page {
+    padding: 16px;
+  }
+
+  .orders-table,
+  .history-table {
+    font-size: 0.78rem;
+  }
+}

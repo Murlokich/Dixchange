@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storeEmail } from '../lib/session';
 
 type AuthPayload = {
   email: string;
@@ -63,6 +64,7 @@ export default function LoginPage() {
 
     try {
       await requestLogin(backendHost, { email, password });
+      storeEmail(email);
       navigate(dashboardPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to complete sign in request.';
@@ -118,6 +120,7 @@ export default function LoginPage() {
 
     try {
       await requestLogin(backendHost, payload);
+      storeEmail(email);
       navigate(dashboardPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to complete sign in request.';
