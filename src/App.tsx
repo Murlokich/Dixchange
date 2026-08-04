@@ -5,18 +5,73 @@ type RegisterPayload = {
   password: string;
 };
 
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
 type StatusState = {
   kind: 'idle' | 'success' | 'error';
   message: string;
 };
 
 const registerPath = '/api/auth/register';
+const loginPath = '/api/auth/login';
 
 export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<StatusState>({ kind: 'idle', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    const backendHost = import.meta.env.VITE_BACKEND_HOST?.trim();
+
+    if (!backendHost) {
+      setStatus({
+        kind: 'error',
+        message: 'Set VITE_BACKEND_HOST in envs/.env before using sign in.',
+      });
+      return;
+    }
+
+    const payload: LoginPayload = {
+      email,
+      password,
+    };
+
+    setIsLoggingIn(true);
+    setStatus({ kind: 'idle', message: '' });
+
+    try {
+      const response = await fetch(`${backendHost}${loginPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Login request failed with status ${response.status}`);
+      }
+
+      setStatus({
+        kind: 'success',
+        message: 'Sign in request sent successfully.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to complete sign in request.';
+
+      setStatus({
+        kind: 'error',
+        message,
+      });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleSignUp = async () => {
     const backendHost = import.meta.env.VITE_BACKEND_HOST?.trim();
@@ -84,7 +139,13 @@ export default function App() {
           </div>
         </div>
 
-        <form className="auth-card" onSubmit={(event) => event.preventDefault()}>
+        <form
+          className="auth-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleLogin();
+          }}
+        >
           <div className="field-group">
             <label htmlFor="email">Email</label>
             <input
@@ -109,8 +170,8 @@ export default function App() {
             />
           </div>
 
-          <button type="submit" className="primary-action">
-            Sign in
+          <button type="submit" className="primary-action" disabled={isLoggingIn}>
+            {isLoggingIn ? 'Signing in...' : 'Sign in'}
           </button>
 
           <button type="button" className="secondary-action" onClick={handleSignUp} disabled={isSubmitting}>
