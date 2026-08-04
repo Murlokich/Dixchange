@@ -9,14 +9,15 @@ import (
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
-	"github.com/dixchange/Monolith/internal/auth/adapter/sql/user"
-	"github.com/dixchange/Monolith/internal/balance/adapter/sql/wallet"
+	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
-	web "github.com/dixchange/Monolith/internal/controller/web"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
+	"github.com/dixchange/Monolith/internal/market/service"
+	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
 
 	"github.com/gin-gonic/gin"
@@ -98,17 +99,23 @@ func main() {
 	}
 	defer postgresPool.Close()
 
-	userRepo := user.NewRepository(postgresPool, pkg.GetDB)
-	balanceRepo := wallet.NewRepository(postgresPool, pkg.GetDB)
+	userRepo := authSQL.NewRepository(postgresPool, pkg.GetDB)
+	balanceRepo := walletSQL.NewRepository(postgresPool, pkg.GetDB)
+	marketRepo := marketSQL.NewRepository(postgresPool, pkg.GetDB)
+	marketCache, err := service.NewDBCache(ctx, marketRepo)
+	if err != nil {
+		log.Errorf("create new market cahce: %v", err)
+		return
+	}
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
 	txManager := pkg.NewTXManager(postgresPool)
 	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
 	if err != nil {
-		log.Errorf("create new manager: %v", err)
+		log.Errorf("create new jwt manager: %v", err)
 		return
 	}
 
-	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, txManager)
+	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 	depositUseCase := deposit.NewUseCase(balanceRepo)
 
@@ -121,8 +128,7 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.SetHTMLTemplate(web.Templates())
-	web.RegisterRoutes(router)
+	api.SetCORSMiddleware(router, cfg.HTTPConfig.FrontendHost)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, "pong")

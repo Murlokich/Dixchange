@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package user
+package sql
 
 import (
 	"github.com/google/uuid"

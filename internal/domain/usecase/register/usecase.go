@@ -17,7 +17,11 @@ type PasswordHasher interface {
 }
 
 type BalanceRepository interface {
-	CreateBalanceRecord(ctx context.Context, userID uuid.UUID) error
+	CreateBalanceRecord(ctx context.Context, balanceRecord entity.BalanceRecord) error
+}
+
+type MarketRepository interface {
+	GetDefaultSymbols() []entity.Symbol
 }
 
 type TXManager interface {
@@ -28,6 +32,7 @@ type UseCase struct {
 	userRepo    UserRepository
 	pwdHasher   PasswordHasher
 	balanceRepo BalanceRepository
+	marketRepo  MarketRepository
 	txManager   TXManager
 }
 
@@ -48,8 +53,20 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 			return errors.Wrap(err, errWrapMessage)
 		}
 
-		if err = u.balanceRepo.CreateBalanceRecord(ctx, user.ID); err != nil {
-			return errors.Wrap(err, errWrapMessage)
+		symbols := u.marketRepo.GetDefaultSymbols()
+
+		for i := range symbols {
+			recordID, err := uuid.NewV7()
+			if err != nil {
+				return errors.Wrap(err, "gen record uuid")
+			}
+			if err = u.balanceRepo.CreateBalanceRecord(ctx, entity.BalanceRecord{
+				ID:       recordID,
+				UserID:   user.ID,
+				SymbolID: symbols[i].ID,
+			}); err != nil {
+				return errors.Wrap(err, errWrapMessage)
+			}
 		}
 
 		return nil
@@ -84,12 +101,14 @@ func NewUseCase(
 	userRepo UserRepository,
 	pwdHasher PasswordHasher,
 	balanceRepo BalanceRepository,
+	marketRepo MarketRepository,
 	txManager TXManager,
 ) *UseCase {
 	return &UseCase{
 		userRepo:    userRepo,
 		pwdHasher:   pwdHasher,
 		balanceRepo: balanceRepo,
+		marketRepo:  marketRepo,
 		txManager:   txManager,
 	}
 }

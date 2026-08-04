@@ -14,6 +14,7 @@ type Config struct {
 type HTTPConfig struct {
 	Addr                     string `required:"true"`
 	ReadHeaderTimeoutSeconds int64  `default:"10" split_words:"true"`
+	FrontendHost             string `default:"http://localhost:5173" split_words:"true"`
 }
 
 type DBConfig struct {

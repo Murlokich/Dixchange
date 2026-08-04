@@ -1,8 +1,9 @@
-package wallet
+package sql
 
 import (
 	"context"
 
+	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -14,13 +15,17 @@ type Repository struct {
 	txGetter pkg.TXGetter
 }
 
-func (r *Repository) CreateBalanceRecord(ctx context.Context, userID uuid.UUID) error {
+func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord entity.BalanceRecord) error {
 	const errWrapMessage = "main repository CreateBalanceRecord"
 
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	if err := q.CreateBalanceRecord(ctx, userID); err != nil {
+	if err := q.CreateBalanceRecord(ctx, CreateBalanceRecordParams{
+		ID:       balanceRecord.ID,
+		UserID:   balanceRecord.UserID,
+		SymbolID: int32(balanceRecord.SymbolID),
+	}); err != nil {
 		return errors.Wrap(err, errWrapMessage)
 	}
 
@@ -34,8 +39,9 @@ func (r *Repository) DepositUSD(ctx context.Context, userID uuid.UUID, amount de
 	q := New(db)
 
 	if err := q.DepositUSD(ctx, DepositUSDParams{
-		Usd:    amount,
-		UserID: userID,
+		Main:     amount,
+		UserID:   userID,
+		SymbolID: 0,
 	}); err != nil {
 		return errors.Wrap(err, errWrapMessage)
 	}
