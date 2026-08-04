@@ -11,7 +11,10 @@ const (
 	authHeader   = "Authorization"
 	bearerPrefix = "Bearer "
 
-	missingTokenResponseMessage = "Access token is missing or format is incorrect"
+	missingTokenResponseMessage        = "Access token is missing or format is incorrect"
+	missingTokenSubjectResponseMessage = "Access token misses subject with user id"
+
+	userIDCtxKey = "userID"
 )
 
 func authMiddleware(c *gin.Context, deps *Dependencies) {
@@ -23,13 +26,21 @@ func authMiddleware(c *gin.Context, deps *Dependencies) {
 		c.Abort()
 		return
 	}
-	_, err := deps.TokenValidator.ValidateToken(tokenStr)
+	token, err := deps.TokenValidator.ValidateToken(tokenStr)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{errorField: missingTokenResponseMessage})
 		deps.Logger.Errorf("authMiddleware validate token: %v", err)
 		c.Abort()
 		return
 	}
+	userID, err := token.Claims.GetSubject()
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{errorField: missingTokenSubjectResponseMessage})
+		deps.Logger.Errorf("authMiddleware get subject token: %v", err)
+		c.Abort()
+		return
+	}
+	c.Set(userIDCtxKey, userID)
 	c.Next()
 }
 

@@ -38,7 +38,7 @@ func TestInput_Validate_UserID(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := deposit.Input{UserID: tc.userID, USDAmount: decimal.NewFromInt(validUSDAmount)}
+			input := deposit.Input{UserID: tc.userID, Amount: decimal.NewFromInt(validUSDAmount)}
 			err := input.Validate(t.Context())
 			if tc.errExpected == nil {
 				require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestInput_Validate_USDAmount(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := deposit.Input{UserID: uuid.MustParse(validUserUID), USDAmount: tc.usdAmount}
+			input := deposit.Input{UserID: uuid.MustParse(validUserUID), Amount: tc.usdAmount}
 			err := input.Validate(t.Context())
 			if tc.errExpected == nil {
 				require.NoError(t, err)

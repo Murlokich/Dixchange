@@ -23,7 +23,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 
-	if err := u.repo.DepositUSD(ctx, input.UserID, input.USDAmount); err != nil {
+	if err := u.repo.DepositUSD(ctx, input.UserID, input.Amount); err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 	return Output{}, nil
