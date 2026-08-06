@@ -26,8 +26,6 @@ type Repository struct {
 }
 
 func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
-	const errWrapMessage = "user repository CreateUser"
-
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
@@ -38,25 +36,23 @@ func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 	}); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation && pgErr.ColumnName == emailColumnName {
-			return errors.Wrap(ErrEmailIsAlreadyUsed, errWrapMessage)
+			return errors.Wrap(ErrEmailIsAlreadyUsed, "query create user")
 		}
-		return errors.Wrap(err, errWrapMessage)
+		return errors.Wrap(err, "query create user")
 	}
 	return nil
 }
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (entity.User, error) {
-	const errWrapMessage = "user repository GetUserByEmail"
-
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
 	user, err := q.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return entity.User{}, errors.Wrap(entity.ErrNoUserFound, errWrapMessage)
+			return entity.User{}, errors.Wrap(entity.ErrNoUserFound, "query get user email")
 		}
-		return entity.User{}, errors.Wrap(err, errWrapMessage)
+		return entity.User{}, errors.Wrap(err, "query get user email")
 	}
 	return entity.User{
 		ID:           user.ID,
