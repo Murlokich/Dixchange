@@ -104,8 +104,9 @@ func depositHandler(c *gin.Context, deps *Dependencies) {
 	}
 
 	_, err = deps.Deposit.Execute(c, deposit.Input{
-		UserID: userUD,
-		Amount: req.Amount,
+		UserID:   userUD,
+		SymbolID: req.SymbolID,
+		Amount:   req.Amount,
 	})
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {

@@ -33,16 +33,17 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord enti
 	return nil
 }
 
-func (r *Repository) DepositUSD(ctx context.Context, userID uuid.UUID, amount decimal.Decimal) error {
+func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
 	const errWrapMessage = "main Repository DepositUSD"
 
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	if err := q.DepositUSD(ctx, DepositUSDParams{
-		Main:     amount,
-		UserID:   userID,
-		SymbolID: 0,
+	if err := q.Deposit(ctx, DepositParams{
+		Main:   amount,
+		UserID: userID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID: int32(symbolID),
 	}); err != nil {
 		return errors.Wrap(err, errWrapMessage)
 	}

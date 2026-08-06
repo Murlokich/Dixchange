@@ -9,7 +9,7 @@ import (
 )
 
 type Repository interface {
-	DepositUSD(ctx context.Context, userID uuid.UUID, amount decimal.Decimal) error
+	Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error
 }
 
 type UseCase struct {
@@ -23,7 +23,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 
-	if err := u.repo.DepositUSD(ctx, input.UserID, input.Amount); err != nil {
+	if err := u.repo.Deposit(ctx, input.UserID, input.SymbolID, input.Amount); err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 	return Output{}, nil

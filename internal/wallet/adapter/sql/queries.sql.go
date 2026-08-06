@@ -27,18 +27,18 @@ func (q *Queries) CreateBalanceRecord(ctx context.Context, arg CreateBalanceReco
 	return err
 }
 
-const depositUSD = `-- name: DepositUSD :exec
+const deposit = `-- name: Deposit :exec
 UPDATE wallet.balance SET main = main + $1 WHERE user_id = $2 AND symbol_id = $3
 `
 
-type DepositUSDParams struct {
+type DepositParams struct {
 	Main     decimal.Decimal
 	UserID   uuid.UUID
 	SymbolID int32
 }
 
-func (q *Queries) DepositUSD(ctx context.Context, arg DepositUSDParams) error {
-	_, err := q.db.Exec(ctx, depositUSD, arg.Main, arg.UserID, arg.SymbolID)
+func (q *Queries) Deposit(ctx context.Context, arg DepositParams) error {
+	_, err := q.db.Exec(ctx, deposit, arg.Main, arg.UserID, arg.SymbolID)
 	return err
 }
 

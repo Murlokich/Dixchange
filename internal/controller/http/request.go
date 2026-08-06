@@ -15,7 +15,8 @@ type RegisterRequest struct {
 }
 
 type DepositRequest struct {
-	Amount decimal.Decimal `json:"amount" binding:"required"`
+	SymbolID int             `json:"symbol_id" binding:"required,min=0"`
+	Amount   decimal.Decimal `json:"amount" binding:"required"`
 }
 
 type CreateOrderRequest struct {
