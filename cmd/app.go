@@ -58,10 +58,9 @@ func runMigrations(dbConfig *config.DBConfig) error {
 }
 
 func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	const errWrapMessage = "cmd setupPostgres setupPostgres"
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "pgxpool ParseConfig")
 	}
 	// Registers shopspringDecimal adapter to convert Numeric(15, 6) into decimal.Decimal
 	// used in domain/entity. Runtime parser for pgx
@@ -71,7 +70,7 @@ func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	}
 	pgxPool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "pgxpool create")
 	}
 	return pgxPool, nil
 }
@@ -107,14 +106,14 @@ func main() {
 	orderRepo := orderSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketCache, err := service.NewDBCache(ctx, marketRepo)
 	if err != nil {
-		log.Errorf("create new market cahce: %v", err)
+		log.Errorf("create market db cache: %v", err)
 		return
 	}
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
 	txManager := pkg.NewTXManager(postgresPool)
 	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
 	if err != nil {
-		log.Errorf("create new jwt manager: %v", err)
+		log.Errorf("create jwt manager: %v", err)
 		return
 	}
 
@@ -145,7 +144,7 @@ func main() {
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("listen: %s\n", err)
+			log.Fatalf("server listen: %s\n", err)
 		}
 	}()
 

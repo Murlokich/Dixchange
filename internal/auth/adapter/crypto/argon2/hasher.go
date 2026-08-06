@@ -30,11 +30,9 @@ type PasswordHasher struct {
 }
 
 func (p *PasswordHasher) GeneratePasswordHash(password string) (string, error) {
-	const errWrapMessage = "argon2 PasswordHasher GeneratePasswordHash"
-
 	salt, err := p.genSalt()
 	if err != nil {
-		return "", errors.Wrap(err, errWrapMessage)
+		return "", errors.Wrap(err, "password hasher gen salt")
 	}
 
 	hash := argon2.IDKey(
@@ -64,12 +62,11 @@ func (p *PasswordHasher) GeneratePasswordHash(password string) (string, error) {
 }
 
 func (p *PasswordHasher) ComparePasswords(password string, passwordHash string) (bool, error) {
-	const errWrapMessage = "argon2 PasswordHasher ComparePasswords"
 	// Extract the parameters, salt and derived key from the encoded password
 	// hash.
 	hashParams, salt, hash, err := decodeHash(passwordHash)
 	if err != nil {
-		return false, errors.Wrap(err, errWrapMessage)
+		return false, errors.Wrap(err, "decode password hash")
 	}
 
 	// Derive the key from the other password using the same parameters.
@@ -92,38 +89,36 @@ func (p *PasswordHasher) ComparePasswords(password string, passwordHash string) 
 }
 
 func decodeHash(encodedHash string) (*Params, []byte, []byte, error) {
-	const errWrapMessage = "decodeHash"
-
 	vals := strings.Split(encodedHash, "$")
 	const passwordHashElementsNumber = 6
 	if len(vals) != passwordHashElementsNumber {
-		return nil, nil, nil, errors.Wrap(ErrInvalidHash, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(ErrInvalidHash, "password hash invalid structure")
 	}
 
 	var version int
 	_, err := fmt.Sscanf(vals[2], "v=%d", &version)
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(err, "scan password hash algo version")
 	}
 	if version != argon2.Version {
-		return nil, nil, nil, errors.Wrap(ErrIncompatibleVersion, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(ErrIncompatibleVersion, "password hash unsupported version")
 	}
 
 	p := &Params{}
 	_, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &p.memory, &p.iter, &p.threads)
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(err, "scan password hash algo settings")
 	}
 
 	salt, err := base64.RawStdEncoding.Strict().DecodeString(vals[4])
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(err, "scan password hash salt")
 	}
 	p.saltLength = uint32(len(salt)) // #nosec G115 - uint32 type required by argon2
 
 	hash, err := base64.RawStdEncoding.Strict().DecodeString(vals[5])
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, errWrapMessage)
+		return nil, nil, nil, errors.Wrap(err, "scan password hash len")
 	}
 	p.hashLength = uint32(len(hash)) // #nosec G115 - uint32 type required by argon2
 
@@ -131,12 +126,10 @@ func decodeHash(encodedHash string) (*Params, []byte, []byte, error) {
 }
 
 func (p *PasswordHasher) genSalt() ([]byte, error) {
-	const errWrapMessage = "genSalt"
-
 	salt := make([]byte, p.params.saltLength)
 	_, err := rand.Read(salt)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "gen salt")
 	}
 	return salt, nil
 }
