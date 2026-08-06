@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
@@ -24,9 +25,10 @@ type Dependencies struct {
 	Logger         Logger
 	TokenValidator TokenValidator
 
-	Register *register.UseCase
-	Login    *login.UseCase
-	Deposit  *deposit.UseCase
+	Register    *register.UseCase
+	Login       *login.UseCase
+	Deposit     *deposit.UseCase
+	CreateOrder *createorder.UseCase
 }
 
 func (d *Dependencies) WrapHandler(handler Handler) gin.HandlerFunc {

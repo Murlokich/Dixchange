@@ -56,7 +56,8 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		symbols := u.marketRepo.GetDefaultSymbols()
 
 		for i := range symbols {
-			recordID, err := uuid.NewV7()
+			var recordID uuid.UUID
+			recordID, err = uuid.NewV7()
 			if err != nil {
 				return errors.Wrap(err, "gen record uuid")
 			}

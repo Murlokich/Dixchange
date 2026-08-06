@@ -22,8 +22,9 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord enti
 	q := New(db)
 
 	if err := q.CreateBalanceRecord(ctx, CreateBalanceRecordParams{
-		ID:       balanceRecord.ID,
-		UserID:   balanceRecord.UserID,
+		ID:     balanceRecord.ID,
+		UserID: balanceRecord.UserID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
 		SymbolID: int32(balanceRecord.SymbolID),
 	}); err != nil {
 		return errors.Wrap(err, errWrapMessage)
@@ -44,6 +45,26 @@ func (r *Repository) DepositUSD(ctx context.Context, userID uuid.UUID, amount de
 		SymbolID: 0,
 	}); err != nil {
 		return errors.Wrap(err, errWrapMessage)
+	}
+	return nil
+}
+
+func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.ReserveFunds(ctx, ReserveFundsParams{
+		Main:   amount,
+		UserID: userID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID: int32(symbolID),
+	})
+	if err != nil {
+		return errors.Wrap(err, "query reserve funds")
+	}
+	const noUserAffected = 0
+	if rows == noUserAffected {
+		return entity.ErrInsufficientBalance
 	}
 	return nil
 }

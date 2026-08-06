@@ -1,14 +1,25 @@
 package http
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterEndpoints(router *gin.RouterGroup, d *Dependencies) {
-	authRouter := router.Group("auth")
+func RegisterEndpoints(router *gin.Engine, d *Dependencies) {
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, "pong")
+	})
+
+	apiRouter := router.Group("api")
+
+	authRouter := apiRouter.Group("auth")
 	authRouter.POST("/login", d.WrapHandler(loginHandler))
 	authRouter.POST("/register", d.WrapHandler(registerHandler))
 
 	balanceRouter := router.Group("balance")
-	balanceRouter.POST("/:user_id/deposit", d.WrapHandler(authMiddleware), d.WrapHandler(depositHandler))
+	balanceRouter.POST("/deposit", d.WrapHandler(authMiddleware), d.WrapHandler(depositHandler))
+
+	orderRouter := router.Group("orders")
+	orderRouter.POST("", d.WrapHandler(authMiddleware), d.WrapHandler(createOrderHandler))
 }

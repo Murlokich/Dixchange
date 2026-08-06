@@ -33,7 +33,14 @@ func setAuthCookies(c *gin.Context, accessToken string) {
 func SetCORSMiddleware(r *gin.Engine, frontendHost string) {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{frontendHost},
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
 		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		// Expose response headers that the frontend is allowed to read
 		ExposeHeaders: []string{"Content-Length"},

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	"github.com/dixchange/Monolith/internal/utils"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func TestInput_Validate_UserID(t *testing.T) {
 		{
 			name:        "invalid nil uid",
 			userID:      uuid.Nil,
-			errExpected: deposit.ErrEmptyUserUID,
+			errExpected: utils.ErrEmptyUserUID,
 		},
 	}
 
@@ -67,12 +68,12 @@ func TestInput_Validate_USDAmount(t *testing.T) {
 		{
 			name:        "invalid negative usd amount",
 			usdAmount:   decimal.NewFromInt(-1),
-			errExpected: deposit.ErrUSDAmountNonPositive,
+			errExpected: utils.ErrDecimalNonPositive,
 		},
 		{
 			name:        "invalid zero usd amount",
 			usdAmount:   decimal.NewFromInt(0),
-			errExpected: deposit.ErrUSDAmountNonPositive,
+			errExpected: utils.ErrDecimalNonPositive,
 		},
 	}
 

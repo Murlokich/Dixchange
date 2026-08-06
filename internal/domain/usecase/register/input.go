@@ -8,11 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	passwordMinLength = 8
-	passwordMaxLength = 256
-)
-
 type Input struct {
 	Email    string
 	Password string

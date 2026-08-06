@@ -1,0 +1,13 @@
+BEGIN;
+
+DROP TABLE IF EXISTS wallet.balance;
+DROP SCHEMA IF EXISTS wallet;
+
+DROP TABLE IF EXISTS market.pair;
+DROP TABLE IF EXISTS market.symbol;
+DROP SCHEMA IF EXISTS market;
+
+DROP TABLE IF EXISTS auth.user;
+DROP SCHEMA IF EXISTS auth;
+
+COMMIT;

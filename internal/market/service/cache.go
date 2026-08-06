@@ -69,3 +69,11 @@ func (c *DBCache) GetPairs() map[int]entity.Pair {
 func (c *DBCache) GetDefaultSymbols() []entity.Symbol {
 	return c.defaultSymbols
 }
+
+func (c *DBCache) GetPair(id int) entity.Pair {
+	return c.market[id]
+}
+
+func (c *DBCache) GetSymbol(id int) entity.Symbol {
+	return c.symbols[id]
+}

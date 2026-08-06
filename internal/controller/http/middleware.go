@@ -1,10 +1,12 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
@@ -16,6 +18,23 @@ const (
 
 	userIDCtxKey = "userID"
 )
+
+var (
+	ErrCtxMissingUserID = errors.New("gin ctx doesn't store user ID key")
+	ErrCtxUserIDNotUID  = errors.New("gin ctx stores non uid string for user ID")
+)
+
+func GetUserIDFromCtx(c *gin.Context) (uuid.UUID, error) {
+	userIDRaw, ok := c.Get(userIDCtxKey)
+	if !ok {
+		return uuid.Nil, ErrCtxMissingUserID
+	}
+	userID, ok := userIDRaw.(uuid.UUID)
+	if !ok {
+		return uuid.Nil, ErrCtxUserIDNotUID
+	}
+	return userID, nil
+}
 
 func authMiddleware(c *gin.Context, deps *Dependencies) {
 	tokenStr, ok := extractAccessToken(c)
@@ -33,10 +52,17 @@ func authMiddleware(c *gin.Context, deps *Dependencies) {
 		c.Abort()
 		return
 	}
-	userID, err := token.Claims.GetSubject()
+	userIDStr, err := token.Claims.GetSubject()
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{errorField: missingTokenSubjectResponseMessage})
 		deps.Logger.Errorf("authMiddleware get subject token: %v", err)
+		c.Abort()
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: missingTokenSubjectResponseMessage})
+		deps.Logger.Errorf("authMiddleware parse subject token: %v", err)
 		c.Abort()
 		return
 	}

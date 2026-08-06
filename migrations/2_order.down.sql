@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS "order"."order";
+DROP TYPE IF EXISTS "order".action;
+DROP SCHEMA IF EXISTS "order";
+
+COMMIT;

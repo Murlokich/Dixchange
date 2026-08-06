@@ -41,3 +41,24 @@ func (q *Queries) DepositUSD(ctx context.Context, arg DepositUSDParams) error {
 	_, err := q.db.Exec(ctx, depositUSD, arg.Main, arg.UserID, arg.SymbolID)
 	return err
 }
+
+const reserveFunds = `-- name: ReserveFunds :execrows
+UPDATE wallet.balance 
+SET main = main - $1,
+    reserved = reserved + $1
+WHERE user_id = $2 AND symbol_id = $3 AND main >= $1
+`
+
+type ReserveFundsParams struct {
+	Main     decimal.Decimal
+	UserID   uuid.UUID
+	SymbolID int32
+}
+
+func (q *Queries) ReserveFunds(ctx context.Context, arg ReserveFundsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reserveFunds, arg.Main, arg.UserID, arg.SymbolID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

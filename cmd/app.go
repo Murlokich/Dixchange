@@ -12,11 +12,13 @@ import (
 	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
+	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
 	"github.com/dixchange/Monolith/internal/market/service"
+	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
 	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
 
@@ -102,6 +104,7 @@ func main() {
 	userRepo := authSQL.NewRepository(postgresPool, pkg.GetDB)
 	balanceRepo := walletSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketRepo := marketSQL.NewRepository(postgresPool, pkg.GetDB)
+	orderRepo := orderSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketCache, err := service.NewDBCache(ctx, marketRepo)
 	if err != nil {
 		log.Errorf("create new market cahce: %v", err)
@@ -118,6 +121,7 @@ func main() {
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 	depositUseCase := deposit.NewUseCase(balanceRepo)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager)
 
 	deps := api.Dependencies{
 		Logger:         log,
@@ -125,18 +129,13 @@ func main() {
 		Register:       regUseCase,
 		Login:          logUseCase,
 		Deposit:        depositUseCase,
+		CreateOrder:    createOrderUseCase,
 	}
 
 	router := gin.Default()
 	api.SetCORSMiddleware(router, cfg.HTTPConfig.FrontendHost)
 
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "pong")
-	})
-
-	apiRouter := router.Group("api")
-
-	api.RegisterEndpoints(apiRouter, &deps)
+	api.RegisterEndpoints(router, &deps)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPConfig.Addr,

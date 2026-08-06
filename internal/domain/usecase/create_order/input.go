@@ -25,7 +25,11 @@ func (i *Input) Validate(ctx context.Context) error {
 	if err := validation.ValidateWithContext(ctx, i.MarketPairID, validation.Min(0)); err != nil {
 		return entity.ValidationError{Err: err}
 	}
-	if err := validation.ValidateWithContext(ctx, i.Action, validation.In(entity.BuyAction, entity.SellAction)); err != nil {
+	if err := validation.ValidateWithContext(
+		ctx,
+		i.Action,
+		validation.In(entity.BuyAction, entity.SellAction),
+	); err != nil {
 		return entity.ValidationError{Err: err}
 	}
 	if err := utils.ValidatePositiveDecimal(ctx, i.QuantityOrdered); err != nil {

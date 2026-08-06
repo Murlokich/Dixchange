@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"github.com/pkg/errors"
 )
@@ -19,6 +19,7 @@ const (
 	registrationFailureResponse      = "Registration failed due to internal error"
 	depositFailureResponse           = "Deposit failed due to internal error"
 	loginFailureResponse             = "Login failed due to internal error"
+	createOrderFailureResponse       = "Order creation failed due to internal error"
 
 	errorField = "error"
 
@@ -95,15 +96,15 @@ func depositHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 
-	userUID, err := uuid.Parse(c.Params.ByName(userIDParamKey))
+	userUD, err := GetUserIDFromCtx(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-		deps.Logger.Errorf("invalid param user_id: %w", err.Error())
+		deps.Logger.Errorf("get user id from ctx: %w", err.Error())
 		return
 	}
 
 	_, err = deps.Deposit.Execute(c, deposit.Input{
-		UserID: userUID,
+		UserID: userUD,
 		Amount: req.Amount,
 	})
 	if err != nil {
@@ -117,4 +118,39 @@ func depositHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.Status(http.StatusOK)
+}
+
+func createOrderHandler(c *gin.Context, deps *Dependencies) {
+	var req CreateOrderRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Errorf(err.Error())
+		return
+	}
+	userUD, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %w", err.Error())
+		return
+	}
+
+	_, err = deps.CreateOrder.Execute(c, createorder.Input{
+		UserID:          userUD,
+		MarketPairID:    req.MarketPairID,
+		Action:          req.Action,
+		QuantityOrdered: req.QuantityOrdered,
+		PricePerUnit:    req.PricePerUnit,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Errorf(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: createOrderFailureResponse})
+		deps.Logger.Errorf(err.Error())
+		return
+	}
+	c.Status(http.StatusCreated)
 }

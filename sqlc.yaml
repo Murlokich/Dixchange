@@ -49,3 +49,11 @@ sql:
         out: "./internal/market/adapter/sql"
         sql_package: "pgx/v5"
         omit_unused_structs: true
+  - engine: "postgresql"
+    queries: "./internal/order/adapter/sql/queries.sql"
+    schema: "./migrations"
+    gen:
+      go: 
+        out: "./internal/order/adapter/sql"
+        sql_package: "pgx/v5"
+        omit_unused_structs: true
