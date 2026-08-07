@@ -32,7 +32,7 @@ func loginHandler(c *gin.Context, deps *Dependencies) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 
@@ -43,18 +43,18 @@ func loginHandler(c *gin.Context, deps *Dependencies) {
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-			deps.Logger.Errorf(err.Error())
+			deps.Logger.Error(err.Error())
 			return
 		}
 
 		if errors.Is(err, login.ErrInvalidCredentials) {
 			c.JSON(http.StatusForbidden, gin.H{errorField: invalidCredentialsResponse})
-			deps.Logger.Errorf(err.Error())
+			deps.Logger.Error(err.Error())
 			return
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: loginFailureResponse})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 	setAuthCookies(c, output.AccessToken)
@@ -66,7 +66,7 @@ func registerHandler(c *gin.Context, deps *Dependencies) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 	_, err := deps.Register.Execute(c, register.Input{
@@ -76,11 +76,11 @@ func registerHandler(c *gin.Context, deps *Dependencies) {
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-			deps.Logger.Errorf(err.Error())
+			deps.Logger.Error(err.Error())
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: registrationFailureResponse})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 
@@ -92,14 +92,14 @@ func depositHandler(c *gin.Context, deps *Dependencies) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 
 	userUD, err := GetUserIDFromCtx(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-		deps.Logger.Errorf("get user id from ctx: %w", err.Error())
+		deps.Logger.Errorf("get user id from ctx: %v", err)
 		return
 	}
 
@@ -111,11 +111,11 @@ func depositHandler(c *gin.Context, deps *Dependencies) {
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-			deps.Logger.Errorf(err.Error())
+			deps.Logger.Error(err.Error())
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: depositFailureResponse})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 	c.Status(http.StatusOK)
@@ -126,13 +126,13 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 	userUD, err := GetUserIDFromCtx(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-		deps.Logger.Errorf("get user id from ctx: %w", err.Error())
+		deps.Logger.Errorf("get user id from ctx: %v", err)
 		return
 	}
 
@@ -146,11 +146,11 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
-			deps.Logger.Errorf(err.Error())
+			deps.Logger.Error(err.Error())
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: createOrderFailureResponse})
-		deps.Logger.Errorf(err.Error())
+		deps.Logger.Error(err.Error())
 		return
 	}
 	c.Status(http.StatusCreated)

@@ -75,6 +75,7 @@ func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pgxPool, nil
 }
 
+//nolint:funlen // for main length is accepted; mainly consists of initializations
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

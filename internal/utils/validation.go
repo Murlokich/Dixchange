@@ -51,10 +51,11 @@ func ValidatePassword(ctx context.Context, password string) error {
 		password,
 		validation.Required,
 		validation.Length(passwordMinLength, passwordMaxLength),
-		validation.Match(regexp.MustCompile(".*[A-Z].*")).Error("password must contain upppercase letter"),                            // Contains upper case letter
-		validation.Match(regexp.MustCompile(".*[a-z].*")).Error("password must contain lowercase letter"),                             // Contains lower case letter
-		validation.Match(regexp.MustCompile(".*[0-9].*")).Error("password must contain digit"),                                        // Contains digit
-		validation.Match(regexp.MustCompile(".*[!@#$%^&*()_+\\-=\\[\\]{};:'\",.<>?/].*")).Error("password must contain special char"), // contains special character
+		validation.Match(regexp.MustCompile(".*[A-Z].*")).Error("password must contain upppercase letter"),
+		validation.Match(regexp.MustCompile(".*[a-z].*")).Error("password must contain lowercase letter"),
+		validation.Match(regexp.MustCompile(".*[0-9].*")).Error("password must contain digit"),
+		validation.Match(
+			regexp.MustCompile(".*[!@#$%^&*()_+\\-=\\[\\]{};:'\",.<>?/].*")).Error("password must contain special char"),
 	)
 }
 

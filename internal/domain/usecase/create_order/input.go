@@ -22,13 +22,14 @@ func (i *Input) Validate(ctx context.Context) error {
 	if err := utils.ValidateUserID(ctx, i.UserID); err != nil {
 		return entity.ValidationError{Err: err}
 	}
-	if err := validation.ValidateWithContext(ctx, i.MarketPairID, validation.Min(0)); err != nil {
+	if err := validation.ValidateWithContext(ctx, i.MarketPairID, validation.Required, validation.Min(0)); err != nil {
 		return entity.ValidationError{Err: err}
 	}
 	if err := validation.ValidateWithContext(
 		ctx,
 		i.Action,
-		validation.In(entity.BuyAction, entity.SellAction),
+		validation.Required.Error("status cannot be blank"),
+		validation.In(entity.BuyAction, entity.SellAction).Error("is not valid status"),
 	); err != nil {
 		return entity.ValidationError{Err: err}
 	}

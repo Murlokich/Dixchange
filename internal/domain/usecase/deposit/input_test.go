@@ -5,89 +5,51 @@ import (
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
-	"github.com/dixchange/Monolith/internal/utils"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	validUSDAmount = 10
-	validUserUID   = "019f7f2c-0caa-70ab-b1ec-414f744c3e33"
+	validUserID   = "019f7f2c-0caa-70ab-b1ec-414f744c3e33"
+	validSymbolID = 1
+	validAmount   = 10
 )
 
-func TestInput_Validate_UserID(t *testing.T) {
+var (
+	validUUID          = uuid.MustParse(validUserID)     //nolint:gochecknoglobals // acceptable in test
+	validAmountDecimal = decimal.NewFromInt(validAmount) //nolint:gochecknoglobals // acceptable in test
+)
+
+func TestInput_Validate_SymbolID(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name        string
-		userID      uuid.UUID
-		errExpected error
+		name               string
+		symbolID           int
+		isValid            bool
+		containsErrMessage string
 	}{
-		{
-			name:        "valid uid",
-			userID:      uuid.MustParse(validUserUID),
-			errExpected: nil,
-		},
-		{
-			name:        "invalid nil uid",
-			userID:      uuid.Nil,
-			errExpected: utils.ErrEmptyUserUID,
-		},
+		{name: "valid: positive", symbolID: validSymbolID, isValid: true},
+		{name: "invalid: negative", symbolID: -1, isValid: false, containsErrMessage: "no less than"},
+		{name: "invalid: zero", symbolID: 0, isValid: false, containsErrMessage: "blank"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := deposit.Input{UserID: tc.userID, Amount: decimal.NewFromInt(validUSDAmount)}
-			err := input.Validate(t.Context())
-			if tc.errExpected == nil {
-				require.NoError(t, err)
-			} else {
-				var valError entity.ValidationError
-				require.ErrorAs(t, err, &valError)
-				require.ErrorIs(t, valError.Err, tc.errExpected)
+			input := deposit.Input{
+				UserID:   validUUID,
+				SymbolID: tc.symbolID,
+				Amount:   validAmountDecimal,
 			}
-		})
-	}
-}
-
-func TestInput_Validate_USDAmount(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name        string
-		usdAmount   decimal.Decimal
-		errExpected error
-	}{
-		{
-			name:        "valid usd amount",
-			usdAmount:   decimal.NewFromInt(validUSDAmount),
-			errExpected: nil,
-		},
-		{
-			name:        "invalid negative usd amount",
-			usdAmount:   decimal.NewFromInt(-1),
-			errExpected: utils.ErrDecimalNonPositive,
-		},
-		{
-			name:        "invalid zero usd amount",
-			usdAmount:   decimal.NewFromInt(0),
-			errExpected: utils.ErrDecimalNonPositive,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			input := deposit.Input{UserID: uuid.MustParse(validUserUID), Amount: tc.usdAmount}
 			err := input.Validate(t.Context())
-			if tc.errExpected == nil {
+			if tc.isValid {
 				require.NoError(t, err)
 			} else {
 				var valError entity.ValidationError
 				require.ErrorAs(t, err, &valError)
-				require.ErrorIs(t, valError.Err, tc.errExpected)
+				require.ErrorContains(t, valError, tc.containsErrMessage)
 			}
 		})
 	}

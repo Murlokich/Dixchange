@@ -31,7 +31,10 @@ func (d *Dependencies) WrapHandler(handler Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqDeps := *d
 		if l, ok := c.Get(loggerWithUserIDCtxKey); ok {
-			reqDeps.Logger = l.(pkg.Logger)
+			reqDeps.Logger, ok = l.(pkg.Logger)
+			if !ok {
+				reqDeps.Logger = d.Logger
+			}
 		}
 		handler(c, &reqDeps)
 	}

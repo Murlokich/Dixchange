@@ -35,7 +35,9 @@ func (r *Repository) CreateUser(ctx context.Context, user entity.User) error {
 		PasswordHash: user.PasswordHash,
 	}); err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation && pgErr.ConstraintName == emailUniqueConstraintName {
+		if errors.As(err, &pgErr) &&
+			pgErr.Code == pgerrcode.UniqueViolation &&
+			pgErr.ConstraintName == emailUniqueConstraintName {
 			return errors.Wrap(ErrEmailIsAlreadyUsed, "query create user")
 		}
 		return errors.Wrap(err, "query create user")
