@@ -1,4 +1,4 @@
--- name: Deposit :exec
+-- name: Deposit :execrows
 UPDATE wallet.balance SET main = main + $1 WHERE user_id = $2 AND symbol_id = $3;
 
 -- name: CreateBalanceRecord :exec

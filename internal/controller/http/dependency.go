@@ -8,21 +8,17 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	"github.com/dixchange/Monolith/pkg"
 )
 
 type Handler func(c *gin.Context, deps *Dependencies)
-
-type Logger interface {
-	Infof(string, ...any)
-	Errorf(string, ...any)
-}
 
 type TokenValidator interface {
 	ValidateToken(accessToken string) (*jwt.Token, error)
 }
 
 type Dependencies struct {
-	Logger         Logger
+	Logger         pkg.Logger
 	TokenValidator TokenValidator
 
 	Register    *register.UseCase
@@ -33,6 +29,10 @@ type Dependencies struct {
 
 func (d *Dependencies) WrapHandler(handler Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		handler(c, d)
+		reqDeps := *d
+		if l, ok := c.Get(loggerWithUserIDCtxKey); ok {
+			reqDeps.Logger = l.(pkg.Logger)
+		}
+		handler(c, &reqDeps)
 	}
 }

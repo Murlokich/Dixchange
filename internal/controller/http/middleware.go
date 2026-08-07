@@ -16,7 +16,9 @@ const (
 	missingTokenResponseMessage        = "Access token is missing or format is incorrect"
 	missingTokenSubjectResponseMessage = "Access token misses subject with user id"
 
-	userIDCtxKey = "userID"
+	userIDCtxKey           = "userID"
+	loggerWithUserIDCtxKey = "logger"
+	userIDLoggerField      = "user_id"
 )
 
 var (
@@ -67,6 +69,7 @@ func authMiddleware(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.Set(userIDCtxKey, userID)
+	c.Set(loggerWithUserIDCtxKey, deps.Logger.WithField(userIDLoggerField, userID))
 	c.Next()
 }
 

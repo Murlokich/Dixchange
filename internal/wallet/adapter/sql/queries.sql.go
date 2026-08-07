@@ -27,7 +27,7 @@ func (q *Queries) CreateBalanceRecord(ctx context.Context, arg CreateBalanceReco
 	return err
 }
 
-const deposit = `-- name: Deposit :exec
+const deposit = `-- name: Deposit :execrows
 UPDATE wallet.balance SET main = main + $1 WHERE user_id = $2 AND symbol_id = $3
 `
 
@@ -37,9 +37,12 @@ type DepositParams struct {
 	SymbolID int32
 }
 
-func (q *Queries) Deposit(ctx context.Context, arg DepositParams) error {
-	_, err := q.db.Exec(ctx, deposit, arg.Main, arg.UserID, arg.SymbolID)
-	return err
+func (q *Queries) Deposit(ctx context.Context, arg DepositParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deposit, arg.Main, arg.UserID, arg.SymbolID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const reserveFunds = `-- name: ReserveFunds :execrows

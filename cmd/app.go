@@ -79,8 +79,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log := logrus.New()
-	log.SetFormatter(&logrus.JSONFormatter{})
+	logrusLogger := logrus.New()
+	logrusLogger.SetFormatter(&logrus.JSONFormatter{})
+	log := pkg.NewLogrusAdapter(logrusLogger)
 
 	var cfg config.Config
 	if err := envconfig.Process("", &cfg); err != nil {

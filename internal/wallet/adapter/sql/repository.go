@@ -10,6 +10,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	noUserAffected = 0
+)
+
 type Repository struct {
 	db       DBTX
 	txGetter pkg.TXGetter
@@ -39,12 +43,16 @@ func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	if err := q.Deposit(ctx, DepositParams{
+	rows, err := q.Deposit(ctx, DepositParams{
 		Main:   amount,
 		UserID: userID,
 		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
 		SymbolID: int32(symbolID),
-	}); err != nil {
+	})
+	if rows == noUserAffected {
+		return errors.Errorf("balance record of symbol: %d for the user doesn't exist", symbolID)
+	}
+	if err != nil {
 		return errors.Wrap(err, errWrapMessage)
 	}
 	return nil
@@ -63,7 +71,6 @@ func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolI
 	if err != nil {
 		return errors.Wrap(err, "query reserve funds")
 	}
-	const noUserAffected = 0
 	if rows == noUserAffected {
 		return entity.ErrInsufficientBalance
 	}
