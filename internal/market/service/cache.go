@@ -77,3 +77,13 @@ func (c *DBCache) GetPair(id int) entity.Pair {
 func (c *DBCache) GetSymbol(id int) entity.Symbol {
 	return c.symbols[id]
 }
+
+func (c *DBCache) PairExists(id int) bool {
+	_, ok := c.market[id]
+	return ok
+}
+
+func (c *DBCache) SymbolExists(id int) bool {
+	_, ok := c.symbols[id]
+	return ok
+}

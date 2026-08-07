@@ -3,17 +3,23 @@ package deposit
 import (
 	"context"
 
+	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 )
 
-type Repository interface {
+type WalletRepository interface {
 	Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error
 }
 
+type MarketRepository interface {
+	SymbolExists(id int) bool
+}
+
 type UseCase struct {
-	repo Repository
+	walletRepo WalletRepository
+	marketRepo MarketRepository
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -23,12 +29,16 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 
-	if err := u.repo.Deposit(ctx, input.UserID, input.SymbolID, input.Amount); err != nil {
+	if !u.marketRepo.SymbolExists(input.SymbolID) {
+		return Output{}, entity.ValidationError{Err: errors.New("market repo symbol doesn't exist")}
+	}
+
+	if err := u.walletRepo.Deposit(ctx, input.UserID, input.SymbolID, input.Amount); err != nil {
 		return Output{}, errors.Wrap(err, errWrapMessage)
 	}
 	return Output{}, nil
 }
 
-func NewUseCase(repo Repository) *UseCase {
-	return &UseCase{repo: repo}
+func NewUseCase(walletRepo WalletRepository, marketRepo MarketRepository) *UseCase {
+	return &UseCase{walletRepo: walletRepo, marketRepo: marketRepo}
 }

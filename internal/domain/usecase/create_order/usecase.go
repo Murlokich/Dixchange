@@ -20,6 +20,7 @@ type WalletRepository interface {
 type MarketRepository interface {
 	GetPair(id int) entity.Pair
 	GetSymbol(id int) entity.Symbol
+	PairExists(id int) bool
 }
 
 type TXManager interface {
@@ -68,6 +69,9 @@ func (u *UseCase) inputToOrder(input Input) (entity.Order, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return entity.Order{}, errors.Wrap(err, "gen order id")
+	}
+	if !u.marketRepo.PairExists(input.MarketPairID) {
+		return entity.Order{}, entity.ValidationError{Err: errors.New("market repo pair doesn't exist")}
 	}
 
 	return entity.Order{
