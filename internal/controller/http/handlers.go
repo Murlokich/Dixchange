@@ -14,12 +14,13 @@ import (
 )
 
 const (
-	invalidRequestParametersResponse = "Invalid request parameters"
-	invalidCredentialsResponse       = "Invalid credentials" //nolint:gosec // False positive for hardcoded creds
-	registrationFailureResponse      = "Registration failed due to internal error"
-	depositFailureResponse           = "Deposit failed due to internal error"
-	loginFailureResponse             = "Login failed due to internal error"
-	createOrderFailureResponse       = "Order creation failed due to internal error"
+	invalidRequestParametersResponse       = "Invalid request parameters"
+	invalidCredentialsResponse             = "Invalid credentials" //nolint:gosec // False positive for hardcoded creds
+	registrationFailureResponse            = "Registration failed due to internal error"
+	depositFailureResponse                 = "Deposit failed due to internal error"
+	loginFailureResponse                   = "Login failed due to internal error"
+	createOrderFailureResponse             = "Order creation failed due to internal error"
+	createOrderInsufficientBalanceResponse = "Order creation faild due to insufficient balance"
 
 	errorField = "error"
 
@@ -146,6 +147,11 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		if errors.Is(err, entity.ErrInsufficientBalance) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: createOrderInsufficientBalanceResponse})
 			deps.Logger.Error(err.Error())
 			return
 		}
