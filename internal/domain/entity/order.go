@@ -52,6 +52,9 @@ func (o *Order) GetCreditAsset() (Symbol, error) {
 	return Symbol{}, errors.Errorf("invalid action value: %s", o.Action)
 }
 
-func (o *Order) GetTotalPrice() decimal.Decimal {
-	return o.PricePerUnit.Mul(o.QuantityOrdered)
+func (o *Order) GetDebitAmount() decimal.Decimal {
+	if o.Action == BuyAction {
+		return o.PricePerUnit.Mul(o.QuantityOrdered)
+	}
+	return o.QuantityOrdered
 }
