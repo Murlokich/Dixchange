@@ -14,6 +14,8 @@ const (
 	sessionCookiePath   = "/"
 	sessionCookieMaxAge = 7 * 24
 
+	secInHour = 3600
+
 	corsMaxAge = 12
 )
 
@@ -22,7 +24,7 @@ func setAuthCookies(c *gin.Context, accessToken string) {
 		Name:     accessTokenCookieName,
 		Value:    accessToken,
 		Path:     sessionCookiePath,
-		MaxAge:   sessionCookieMaxAge,
+		MaxAge:   sessionCookieMaxAge * secInHour,
 		Expires:  time.Now().Add(sessionCookieMaxAge * time.Hour),
 		HttpOnly: true,
 		Secure:   true,
