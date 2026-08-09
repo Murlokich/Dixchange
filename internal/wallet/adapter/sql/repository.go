@@ -49,11 +49,11 @@ func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int
 		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
 		SymbolID: int32(symbolID),
 	})
-	if rows == noUserAffected {
-		return errors.Errorf("balance record of symbol: %d for the user doesn't exist", symbolID)
-	}
 	if err != nil {
 		return errors.Wrap(err, errWrapMessage)
+	}
+	if rows == noUserAffected {
+		return errors.Errorf("balance record of symbol: %d for the user doesn't exist", symbolID)
 	}
 	return nil
 }
