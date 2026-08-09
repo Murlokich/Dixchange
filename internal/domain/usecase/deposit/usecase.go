@@ -23,10 +23,8 @@ type UseCase struct {
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
-	const errWrapMessage = "deposit UseCase Execute"
-
 	if err := input.Validate(ctx); err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "input validate")
 	}
 
 	if !u.marketRepo.SymbolExists(input.SymbolID) {
@@ -34,7 +32,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	}
 
 	if err := u.walletRepo.Deposit(ctx, input.UserID, input.SymbolID, input.Amount); err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "wallet repo deposit")
 	}
 	return Output{}, nil
 }

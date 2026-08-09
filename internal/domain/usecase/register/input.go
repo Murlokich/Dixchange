@@ -14,12 +14,11 @@ type Input struct {
 }
 
 func (i *Input) Validate(ctx context.Context) error {
-	const errWrapMessage = "register input validate"
 	if err := utils.ValidateEmail(ctx, i.Email); err != nil {
-		return errors.Wrap(entity.ValidationError{Err: err}, errWrapMessage)
+		return errors.Wrap(entity.ValidationError{Err: err}, "validate email")
 	}
 	if err := utils.ValidatePassword(ctx, i.Password); err != nil {
-		return errors.Wrap(entity.ValidationError{Err: err}, errWrapMessage)
+		return errors.Wrap(entity.ValidationError{Err: err}, "validate password")
 	}
 
 	return nil

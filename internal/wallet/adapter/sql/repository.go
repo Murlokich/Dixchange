@@ -20,8 +20,6 @@ type Repository struct {
 }
 
 func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord entity.BalanceRecord) error {
-	const errWrapMessage = "main repository CreateBalanceRecord"
-
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
@@ -31,15 +29,13 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord enti
 		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
 		SymbolID: int32(balanceRecord.SymbolID),
 	}); err != nil {
-		return errors.Wrap(err, errWrapMessage)
+		return errors.Wrap(err, "query create balance record")
 	}
 
 	return nil
 }
 
 func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
-	const errWrapMessage = "main Repository DepositUSD"
-
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
@@ -50,7 +46,7 @@ func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int
 		SymbolID: int32(symbolID),
 	})
 	if err != nil {
-		return errors.Wrap(err, errWrapMessage)
+		return errors.Wrap(err, "query deposit")
 	}
 	if rows == noUserAffected {
 		return errors.Errorf("balance record of symbol: %d for the user doesn't exist", symbolID)

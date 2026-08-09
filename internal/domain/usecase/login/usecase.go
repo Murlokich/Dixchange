@@ -30,29 +30,27 @@ type UseCase struct {
 // TODO: for now - assign single long term access token
 // make normal authentication with refresh token, revocation, etc.
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
-	const errWrapMessage = "login usecase Execute"
-
 	if err := input.Validate(ctx); err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "input validate")
 	}
 
 	user, err := u.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, entity.ErrNoUserFound) {
-			return Output{}, errors.Wrap(ErrInvalidCredentials, errWrapMessage)
+			return Output{}, errors.Wrap(ErrInvalidCredentials, "repo get user by email")
 		}
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "repo get user by email")
 	}
 	match, err := u.pwdHasher.ComparePasswords(input.Password, user.PasswordHash)
 	if err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "password hasher compare")
 	}
 	if !match {
-		return Output{}, errors.Wrap(ErrInvalidCredentials, errWrapMessage)
+		return Output{}, errors.Wrap(ErrInvalidCredentials, "password hasher compare")
 	}
 	token, err := u.jwtIssuer.IssueToken(user.ID)
 	if err != nil {
-		return Output{}, errors.Wrap(err, errWrapMessage)
+		return Output{}, errors.Wrap(err, "jwt issuer issue token")
 	}
 	return Output{AccessToken: token}, nil
 }
