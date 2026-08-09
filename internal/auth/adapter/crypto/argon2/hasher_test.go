@@ -23,7 +23,7 @@ var testParams = &config.Argon2Config{ //nolint:gochecknoglobals // acceptable i
 
 // hashRX matches the encoded hash format GeneratePasswordHash produces for
 // testParams, so it stays correct if the params above ever change.
-var hashRX = regexp.MustCompile(fmt.Sprintf( //nolint:gochecknoglobals // acceptable in test
+var hashRX = regexp.MustCompile(fmt.Sprintf(
 	`^\$argon2id\$v=%d\$m=%d,t=%d,p=%d\$[A-Za-z0-9+/]{%d}\$[A-Za-z0-9+/]{%d}$`,
 	cryptoargon2.Version,
 	testParams.Memory,
@@ -40,7 +40,7 @@ var hashRX = regexp.MustCompile(fmt.Sprintf( //nolint:gochecknoglobals // accept
 // so it is independent of testParams above and of p=2/32-byte-key here.
 const bugHash = "$argon2id$v=19$m=65536,t=1,p=2$UDk0zEuIzbt0x3bwkf8Bgw$ihSfHWUJpTgDvNWiojrgcN4E0pJdUVmqCEdRZesx9tE"
 
-var memoryParamRX = regexp.MustCompile(`m=\d+`) //nolint:gochecknoglobals // acceptable in test
+var memoryParamRX = regexp.MustCompile(`m=\d+`)
 
 func TestPasswordHasher_GeneratePasswordHash(t *testing.T) {
 	t.Parallel()
