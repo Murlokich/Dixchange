@@ -9,12 +9,18 @@ import (
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
-	"github.com/dixchange/Monolith/internal/auth/adapter/sql/user"
-	"github.com/dixchange/Monolith/internal/balance/adapter/sql/wallet"
+	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
+	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
+	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
+	"github.com/dixchange/Monolith/internal/market/service"
+	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
+	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
+	"github.com/dixchange/Monolith/pkg"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-migrate/migrate/v4"
@@ -52,10 +58,9 @@ func runMigrations(dbConfig *config.DBConfig) error {
 }
 
 func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	const errWrapMessage = "cmd setupPostgres setupPostgres"
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "pgxpool ParseConfig")
 	}
 	// Registers shopspringDecimal adapter to convert Numeric(15, 6) into decimal.Decimal
 	// used in domain/entity. Runtime parser for pgx
@@ -65,17 +70,19 @@ func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	}
 	pgxPool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "pgxpool create")
 	}
 	return pgxPool, nil
 }
 
+//nolint:funlen // for main length is accepted; mainly consists of initializations
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log := logrus.New()
-	log.SetFormatter(&logrus.JSONFormatter{})
+	logrusLogger := logrus.New()
+	logrusLogger.SetFormatter(&logrus.JSONFormatter{})
+	log := pkg.NewLogrusAdapter(logrusLogger)
 
 	var cfg config.Config
 	if err := envconfig.Process("", &cfg); err != nil {
@@ -95,33 +102,41 @@ func main() {
 	}
 	defer postgresPool.Close()
 
-	userRepo := user.NewRepository(postgresPool)
-	balanceRepo := wallet.NewRepository(postgresPool)
+	userRepo := authSQL.NewRepository(postgresPool, pkg.GetDB)
+	balanceRepo := walletSQL.NewRepository(postgresPool, pkg.GetDB)
+	marketRepo := marketSQL.NewRepository(postgresPool, pkg.GetDB)
+	orderRepo := orderSQL.NewRepository(postgresPool, pkg.GetDB)
+	marketCache, err := service.NewDBCache(ctx, marketRepo)
+	if err != nil {
+		log.Errorf("create market db cache: %v", err)
+		return
+	}
 	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
+	txManager := pkg.NewTXManager(postgresPool)
 	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
 	if err != nil {
-		log.Errorf("create new manager: %v", err)
+		log.Errorf("create jwt manager: %v", err)
 		return
 	}
 
-	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo)
+	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
+	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager)
 
 	deps := api.Dependencies{
-		Logger:   log,
-		Register: regUseCase,
-		Login:    logUseCase,
+		Logger:         log,
+		TokenValidator: jwtManager,
+		Register:       regUseCase,
+		Login:          logUseCase,
+		Deposit:        depositUseCase,
+		CreateOrder:    createOrderUseCase,
 	}
 
 	router := gin.Default()
+	api.SetCORSMiddleware(router, cfg.HTTPConfig.FrontendHost)
 
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "pong")
-	})
-
-	apiRouter := router.Group("api")
-
-	api.RegisterEndpoints(apiRouter, &deps)
+	api.RegisterEndpoints(router, &deps)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPConfig.Addr,
@@ -131,7 +146,7 @@ func main() {
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("listen: %s\n", err)
+			log.Fatalf("server listen: %s\n", err)
 		}
 	}()
 

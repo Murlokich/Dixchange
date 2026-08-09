@@ -13,5 +13,6 @@ func (v ValidationError) Error() string {
 }
 
 var (
-	ErrNoUserFound = errors.New("No such user was found")
+	ErrNoUserFound         = errors.New("No such user was found")
+	ErrInsufficientBalance = errors.New("User has insufficient balance for the corresponding action")
 )

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	tokenValidityPeriod = time.Duration(24 * 7)
+	tokenValidityPeriod = 24 * 7
 )
 
 type Manager struct {
@@ -24,40 +24,37 @@ type Manager struct {
 }
 
 func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
-	const errWrapMessage = "jwt manager IssueToken"
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", errors.Wrap(err, errWrapMessage)
+		return "", errors.Wrap(err, "gen jwt id")
 	}
 
 	claims := jwt.RegisteredClaims{
 		Issuer:    m.issuer,
 		Subject:   userID.String(),
 		Audience:  jwt.ClaimStrings{m.audience},
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenValidityPeriod)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenValidityPeriod * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ID:        id.String(),
 	}
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(&m.privateKey)
 	if err != nil {
-		return "", errors.Wrap(err, errWrapMessage)
+		return "", errors.Wrap(err, "sign jwt token")
 	}
 	return token, nil
 }
 
 func (m *Manager) ValidateToken(accessToken string) (*jwt.Token, error) {
-	const errWrapMessage = "jwt manager ValidateToken"
-
 	parser := jwt.NewParser()
 
 	// return manager's public key to validate token
 	getKey := func(*jwt.Token) (any, error) {
-		return m.publicKey, nil
+		return &m.publicKey, nil
 	}
 	token, err := parser.Parse(accessToken, getKey)
 	if err != nil {
-		return nil, errors.Wrap(err, errWrapMessage)
+		return nil, errors.Wrap(err, "parse token")
 	}
 	return token, nil
 }
