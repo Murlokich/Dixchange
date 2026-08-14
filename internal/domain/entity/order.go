@@ -22,9 +22,9 @@ type Order struct {
 	UserID          uuid.UUID
 	MarketPair      Pair
 	Action          string
-	QuantityOrdered decimal.Decimal
-	QuantityFilled  decimal.Decimal
-	PricePerUnit    decimal.Decimal
+	QuantityOrdered int64 // TODO: fix migration to int
+	QuantityFilled  int64 // TODO: fix migration to int
+	PricePerUnit    int64 // TODO: fix migration to int
 	Status          string
 	CreatedAt       time.Time
 	LastUpdatedAt   time.Time
