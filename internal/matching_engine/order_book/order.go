@@ -38,6 +38,10 @@ func (o *Order) IsSatisfactoryPrice(price int64) bool {
 	return price >= o.Price
 }
 
+func (o *Order) IsFilled() bool {
+	return o.RemainingQuantity == 0
+}
+
 func NewOrderFromEntity(order entity.Order) Order {
 	return Order{
 		ID:                order.ID,

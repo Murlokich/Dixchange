@@ -1,8 +1,8 @@
 package orderbook
 
 import (
-	"cmp"
 	"container/list"
+	"fmt"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/btree"
@@ -15,87 +15,73 @@ var (
 	ErrBestAskInvariantBroken = errors.New("No best ask found inside the loop")
 )
 
-type PriceLevel struct {
-	Price  int64
-	Orders *list.List
-}
-
-func less(x, y PriceLevel) bool {
-	return cmp.Less(x.Price, y.Price)
+type deletableNode struct {
+	node *list.Element
+	list *list.List
 }
 
 type Book struct {
 	asks   *asks
 	bids   *bids
-	orders map[uuid.UUID]*list.Element // reverse lookup map to list nodes stored in price levels of asks/bids
+	orders map[uuid.UUID]deletableNode // reverse lookup map to list nodes stored in price levels of asks/bids
 }
 
-func (b *Book) AddOrder(order Order) []Trade {
-	return nil
-}
-
-func (b *Book) matchOrder(order *Order) ([]Trade, error) {
+// Matches the orders and forms the trades; If Order cannot be fully filled immediately
+// appends it to the appropriate resting queue
+func (b *Book) AddOrder(order *Order) ([]Trade, error) {
 	trades := make([]Trade, 0)
 	oppositeSide := b.oppositeSide(order.Side)
-	// filling loop - iterate until can still produce trades
-	// while there are price levels and order is not filled yet
-	for oppositeSide.Len() > 0 && order.RemainingQuantity > 0 {
+
+	for oppositeSide.Len() > 0 && !order.IsFilled() {
 		bestPriceLevel, ok := oppositeSide.getBestPriceLevel()
 		if !ok {
 			return nil, ErrBestAskInvariantBroken
 		}
-		// price doesn't satisfy the order
 		if !order.IsSatisfactoryPrice(bestPriceLevel.Price) {
 			break
 		}
-		// loop over orders on the price level for trades creation
-		for bestPriceLevel.Orders.Len() > 0 && order.RemainingQuantity > 0 {
-			// extract first order in the queue
-			topNode := bestPriceLevel.Orders.Front()
-			topOrder, ok := topNode.Value.(*Order)
-			if !ok {
-				return nil, ErrInvalidTypeInList
-			}
-			trade, err := executeTrade(topOrder, order)
-			if err != nil {
-				return nil, errors.Wrap(err, "executeTrade")
-			}
-			trades = append(trades, trade)
-			// if resting order was filled - remove from the order book
-			if topOrder.RemainingQuantity == 0 {
-				bestPriceLevel.Orders.Remove(topNode)
-				delete(b.orders, topOrder.ID)
-			}
+		plTrades, err := b.createTradesForPriceLevel(bestPriceLevel, order, trades, oppositeSide)
+		if err != nil {
+			return nil, errors.Wrap(err, "match price level")
 		}
-		// if best price level was fully exhausted - delete it
-		if bestPriceLevel.Orders.Len() == 0 {
-			oppositeSide.Delete(bestPriceLevel)
-		}
+		trades = append(trades, plTrades...)
 	}
 	// no more trades can be produced
-
-	if order.RemainingQuantity == 0 {
+	if order.IsFilled() {
 		return trades, nil
 	}
-	sameSide := b.sameSide(order.Side)
-	// insert order to the resting queue
-	priceLvl, ok := sameSide.Get(PriceLevel{order.Price, nil})
-
-	var nodeWithNewOrder *list.Element
-	// price level doesn't exist in bids, create new one
-	if !ok {
-		// initialize new list with provided order
-		orderList := list.New()
-		nodeWithNewOrder = orderList.PushBack(order)
-		// create new price level
-		priceLvl = PriceLevel{order.Price, orderList}
-		sameSide.ReplaceOrInsert(priceLvl)
-	} else {
-		// price level exists, just add order to the end of the list
-		nodeWithNewOrder = priceLvl.Orders.PushBack(order)
-	}
-	b.orders[order.ID] = nodeWithNewOrder
+	b.insertRestingOrder(order)
 	return trades, nil
+}
+
+func (b *Book) CancelOrder(id uuid.UUID) (bool, error) {
+	nodeInfo, ok := b.orders[id]
+	if !ok {
+		return false, nil
+	}
+	order, ok := nodeInfo.node.Value.(*Order)
+	if !ok {
+		return false, ErrInvalidTypeInList
+	}
+	nodeInfo.list.Remove(nodeInfo.node)
+	delete(b.orders, id)
+	if nodeInfo.list.Len() > 0 {
+		return true, nil
+	}
+	// if it was last order - delete price level
+	_, ok = b.sameSide(order.Side).Delete(PriceLevel{Price: order.Price})
+	if !ok {
+		return false, fmt.Errorf("delete price level: %d", order.Price)
+	}
+	return true, nil
+}
+
+func NewBook(b int) *Book {
+	return &Book{
+		asks:   &asks{btree.NewG[PriceLevel](b, less)},
+		bids:   &bids{btree.NewG[PriceLevel](b, less)},
+		orders: make(map[uuid.UUID]deletableNode),
+	}
 }
 
 // returns pointer to the requested side
@@ -141,10 +127,52 @@ func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 	}, nil
 }
 
-func NewBook(b int) *Book {
-	return &Book{
-		asks:   &asks{btree.NewG[PriceLevel](b, less)},
-		bids:   &bids{btree.NewG[PriceLevel](b, less)},
-		orders: make(map[uuid.UUID]*list.Element),
+func (b *Book) insertRestingOrder(order *Order) {
+	sameSide := b.sameSide(order.Side)
+	priceLvl, ok := sameSide.Get(PriceLevel{Price: order.Price})
+
+	var nodeWithNewOrder *list.Element
+	// price level doesn't exist in bids, create new one
+	if !ok {
+		orderList := list.New()
+		nodeWithNewOrder = orderList.PushBack(order)
+		priceLvl = PriceLevel{order.Price, orderList}
+		sameSide.ReplaceOrInsert(priceLvl)
+	} else {
+		// price level exists, just add order to the end of the list
+		nodeWithNewOrder = priceLvl.Orders.PushBack(order)
 	}
+	b.orders[order.ID] = deletableNode{
+		node: nodeWithNewOrder,
+		list: priceLvl.Orders,
+	}
+}
+
+// Iterates over price level and creates trades; created for main matching function simplification;
+// Must be used only on already matched price level (this function doesn't intend to check matching condition)
+func (b *Book) createTradesForPriceLevel(bestPriceLevel PriceLevel, order *Order, trades []Trade, oppositeSide bookSide) ([]Trade, error) {
+	// iterate within price level
+	for bestPriceLevel.Orders.Len() > 0 && !order.IsFilled() {
+		// extract first order in the queue
+		topNode := bestPriceLevel.Orders.Front()
+		topOrder, ok := topNode.Value.(*Order)
+		if !ok {
+			return nil, ErrInvalidTypeInList
+		}
+		trade, err := executeTrade(topOrder, order)
+		if err != nil {
+			return nil, errors.Wrap(err, "executeTrade")
+		}
+		trades = append(trades, trade)
+		// if resting order was filled - remove from the order book
+		if topOrder.IsFilled() {
+			bestPriceLevel.Orders.Remove(topNode)
+			delete(b.orders, topOrder.ID)
+		}
+	}
+	// if best price level was fully exhausted - delete it
+	if bestPriceLevel.Orders.Len() == 0 {
+		oppositeSide.Delete(bestPriceLevel)
+	}
+	return trades, nil
 }
