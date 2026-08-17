@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -52,9 +51,9 @@ func (o *Order) GetCreditAsset() (Symbol, error) {
 	return Symbol{}, errors.Errorf("invalid action value: %s", o.Action)
 }
 
-func (o *Order) GetDebitAmount() decimal.Decimal {
+func (o *Order) GetDebitAmount() int64 {
 	if o.Action == BuyAction {
-		return o.PricePerUnit.Mul(o.QuantityOrdered)
+		return o.PricePerUnit * o.QuantityOrdered
 	}
 	return o.QuantityOrdered
 }

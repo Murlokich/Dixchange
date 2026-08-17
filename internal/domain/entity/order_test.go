@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,17 +47,17 @@ func TestOrder_GetDebitNumber(t *testing.T) {
 	testCases := []struct {
 		name   string
 		action string
-		want   decimal.Decimal
+		want   int64
 	}{
 		{
 			name:   "buy debits price times quantity (quote asset)",
 			action: entity.BuyAction,
-			want:   decimal.NewFromInt(2000), // 100 * 20
+			want:   2000,
 		},
 		{
 			name:   "sell debits quantity (base asset)",
 			action: entity.SellAction,
-			want:   decimal.NewFromInt(20),
+			want:   20,
 		},
 	}
 
@@ -67,10 +66,10 @@ func TestOrder_GetDebitNumber(t *testing.T) {
 			t.Parallel()
 			order := entity.Order{
 				Action:          tc.action,
-				PricePerUnit:    decimal.NewFromInt(100),
-				QuantityOrdered: decimal.NewFromInt(20),
+				PricePerUnit:    100,
+				QuantityOrdered: 20,
 			}
-			require.True(t, tc.want.Equal(order.GetDebitAmount()))
+			require.Equal(t, tc.want, order.GetDebitAmount())
 		})
 	}
 }
