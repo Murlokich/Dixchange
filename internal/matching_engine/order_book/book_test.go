@@ -27,6 +27,7 @@ type testCase struct {
 
 type step struct {
 	order          *Order
+	cancelID       *uuid.UUID
 	wantTrades     []Trade
 	topAskQuantity *int64 // if nil - don't check it
 	topBidQuantity *int64 // if nil - don't check it
@@ -272,6 +273,50 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 	testSteps(t, &tc)
 }
 
+// Create two orders on the same price level
+// Cancel one of the orders
+// Check that price level remained
+func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
+	const (
+		fixedPrice    = 100
+		fixedQuantity = 10
+	)
+
+	orderInputs := []orderInput{
+		{
+			side:     entity.SellAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		},
+		{
+			side:     entity.SellAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		},
+	}
+
+	orders := prepOrders(orderInputs)
+	steps := make([]step, len(orders)+1)
+	for i := range len(orders) {
+		steps[i] = step{
+			order:      orders[i],
+			wantTrades: noTrades,
+		}
+	}
+	steps[len(steps)-1] = step{
+		cancelID: &orders[0].ID,
+	}
+	tc := testCase{
+		steps: steps,
+		finalBookState: finalBookState{
+			asksShape: map[int64]int{orders[1].Price: 1},
+			bidsShape: nil,
+			orderIDs:  []uuid.UUID{orders[1].ID},
+		},
+	}
+	testSteps(t, &tc)
+}
+
 // Create multiple buy/sell orders with not matching prices
 // Expected not to see any trades as a result
 func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
@@ -330,6 +375,12 @@ func testSteps(t *testing.T, tc *testCase) {
 
 	for i, step := range tc.steps {
 		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {
+			if step.cancelID != nil {
+				ok, err := book.CancelOrder(*step.cancelID)
+				require.NoError(t, err)
+				require.True(t, ok)
+				return
+			}
 			trades, err := book.AddOrder(step.order)
 			require.NoError(t, err)
 			assert.Equal(t, step.wantTrades, trades)
