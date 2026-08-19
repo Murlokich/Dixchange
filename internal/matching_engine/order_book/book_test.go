@@ -210,6 +210,68 @@ func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 	testSteps(t, &tc)
 }
 
+// Create multiple resting orders on the same price level
+// Validate that orders are filled in FIFO order
+func TestBook_AddOrder_FIFO(t *testing.T) {
+	const (
+		fixedPrice          = 100
+		fixedQuantity       = 10
+		ordersPerSideNumber = 10
+	)
+
+	orderInputs := make([]orderInput, ordersPerSideNumber*2)
+	for i := range ordersPerSideNumber {
+		orderInputs[i] = orderInput{
+			side:     entity.BuyAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		}
+	}
+	for i := range ordersPerSideNumber {
+		orderInputs[ordersPerSideNumber+i] = orderInput{
+			side:     entity.SellAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		}
+	}
+
+	orders := prepOrders(orderInputs)
+	steps := make([]step, ordersPerSideNumber*2)
+
+	// buy steps
+	for i := range ordersPerSideNumber {
+		steps[i] = step{
+			order:      orders[i],
+			wantTrades: noTrades,
+		}
+	}
+	// sell steps
+	for i := range ordersPerSideNumber {
+		steps[ordersPerSideNumber+i] = step{
+			order: orders[ordersPerSideNumber+i],
+			wantTrades: []Trade{
+				{
+					AskOrderID: orders[ordersPerSideNumber+i].ID,
+					BidOrderID: orders[i].ID,
+					Price:      fixedPrice,
+					Quantity:   fixedQuantity,
+				},
+			},
+		}
+	}
+
+	tc := testCase{
+		steps: steps,
+		finalBookState: finalBookState{
+			asksShape: nil,
+			bidsShape: nil,
+			orderIDs:  nil,
+		},
+	}
+
+	testSteps(t, &tc)
+}
+
 // Main logic which checks order book state after each step and its final state
 func testSteps(t *testing.T, tc *testCase) {
 	book := NewBook(8)
