@@ -272,6 +272,58 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 	testSteps(t, &tc)
 }
 
+// Create multiple buy/sell orders with not matching prices
+// Expected not to see any trades as a result
+func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
+	const fixedQuantity = 10
+
+	buyPrices := []int64{200, 201, 205, 210, 211}
+	mxBuyPrice := slices.Max(buyPrices) + 1
+	ordersPerSideNumber := len(buyPrices) * 2
+
+	orderInputs := make([]orderInput, 0, ordersPerSideNumber*2)
+	for _, price := range buyPrices {
+		for range 2 {
+			orderInputs = append(orderInputs,
+				orderInput{
+					side:     entity.BuyAction,
+					price:    price,
+					quantity: fixedQuantity,
+				},
+				orderInput{
+					side:     entity.SellAction,
+					price:    mxBuyPrice,
+					quantity: fixedQuantity,
+				})
+		}
+	}
+	orders := prepOrders(orderInputs)
+	steps := make([]step, ordersPerSideNumber*2)
+	for i := range len(steps) {
+		steps[i] = step{
+			order:      orders[i],
+			wantTrades: noTrades,
+		}
+	}
+	bidsShape := map[int64]int{}
+	for _, price := range buyPrices {
+		bidsShape[price] = 2
+	}
+	orderIDs := make([]uuid.UUID, len(orders))
+	for i := range len(orders) {
+		orderIDs[i] = orders[i].ID
+	}
+	tc := testCase{
+		steps: steps,
+		finalBookState: finalBookState{
+			asksShape: map[int64]int{mxBuyPrice: ordersPerSideNumber},
+			bidsShape: bidsShape,
+			orderIDs:  orderIDs,
+		},
+	}
+	testSteps(t, &tc)
+}
+
 // Main logic which checks order book state after each step and its final state
 func testSteps(t *testing.T, tc *testCase) {
 	book := NewBook(8)
