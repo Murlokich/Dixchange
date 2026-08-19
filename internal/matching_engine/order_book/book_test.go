@@ -33,9 +33,9 @@ type step struct {
 }
 
 type finalBookState struct {
-	asksLen  int
-	bidsLen  int
-	orderIDs []uuid.UUID
+	asksShape map[int64]int // map from price level to number of orders
+	bidsShape map[int64]int // map from price level to number of orders
+	orderIDs  []uuid.UUID
 }
 
 type orderInput struct {
@@ -47,7 +47,7 @@ type orderInput struct {
 // This test inserts 9 sell orders across three different price leves: [78, 79, 80]
 // Then appends big limit order with price 81 - having exceeding quantity over all existing orders
 // Expected to match all the appended orders, clear the order book and keep single resting buying order
-func TestBook_AddOrder_MultiplePriceLevelsConsumption(t *testing.T) {
+func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 	orderInputs := []orderInput{
 		{
 			side:     entity.SellAction,
@@ -128,9 +128,82 @@ func TestBook_AddOrder_MultiplePriceLevelsConsumption(t *testing.T) {
 	tc := testCase{
 		steps: steps,
 		finalBookState: finalBookState{
-			asksLen:  0,
-			bidsLen:  1,
-			orderIDs: []uuid.UUID{orders[9].ID},
+			asksShape: map[int64]int{},
+			bidsShape: map[int64]int{orders[9].Price: 1},
+			orderIDs:  []uuid.UUID{orders[9].ID},
+		},
+	}
+
+	testSteps(t, &tc)
+}
+
+// Create one big buy order
+// Create multiple small sell orders to match big one
+// End with two non-matching orders and remaining big one
+func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
+	orderInputs := []orderInput{
+		{
+			side:     entity.BuyAction,
+			price:    90,
+			quantity: 400,
+		},
+	}
+
+	// create two orders of 10 and 20 quantity across price levels [85, ..., 91]
+	for price := 91; price >= 85; price-- {
+		orderInputs = append(orderInputs,
+			orderInput{
+				side:     entity.SellAction,
+				price:    int64(price),
+				quantity: 10,
+			},
+			orderInput{
+				side:     entity.SellAction,
+				price:    int64(price),
+				quantity: 20,
+			},
+		)
+	}
+
+	orders := prepOrders(orderInputs)
+	steps := make([]step, len(orders))
+	// create big buy order
+	steps[0] = step{
+		order:      orders[0],
+		wantTrades: noTrades,
+	}
+	// first two orders with price 91 - no match
+	steps[1], steps[2] = step{
+		order:      orders[1],
+		wantTrades: noTrades,
+	}, step{
+		order:      orders[2],
+		wantTrades: noTrades,
+	}
+
+	bigOrderRemainingQuantity := []int64{390, 370, 360, 340, 330, 310, 300, 280, 270, 250, 240, 220}
+	// create steps for matching small orders
+	for i := 3; i < len(orders); i++ {
+		steps[i] = step{
+			order: orders[i],
+			wantTrades: []Trade{
+				{
+					AskOrderID: orders[i].ID,
+					BidOrderID: orders[0].ID,
+					Price:      orders[0].Price,
+					Quantity:   orders[i].RemainingQuantity,
+				},
+			},
+			topBidQuantity: &bigOrderRemainingQuantity[i-3],
+		}
+	}
+
+	tc := testCase{
+		steps: steps,
+		finalBookState: finalBookState{
+			asksShape: map[int64]int{orders[1].Price: 2},
+			bidsShape: map[int64]int{orders[0].Price: 1},
+			orderIDs:  []uuid.UUID{orders[0].ID, orders[1].ID, orders[2].ID},
 		},
 	}
 
@@ -154,10 +227,22 @@ func testSteps(t *testing.T, tc *testCase) {
 			}
 		})
 	}
-	assert.Equal(t, tc.finalBookState.asksLen, book.asks.Len())
-	assert.Equal(t, tc.finalBookState.bidsLen, book.bids.Len())
-	assert.Len(t, book.orders, tc.finalBookState.asksLen+tc.finalBookState.bidsLen)
+	assert.Equal(t, len(tc.finalBookState.asksShape), book.asks.Len())
+	assert.Equal(t, len(tc.finalBookState.bidsShape), book.bids.Len())
 	assert.ElementsMatch(t, tc.finalBookState.orderIDs, slices.Collect(maps.Keys(book.orders)))
+
+	// validate orders number per price level for asks
+	for price, orderCount := range tc.finalBookState.asksShape {
+		pl, ok := book.asks.Get(PriceLevel{Price: price})
+		require.True(t, ok)
+		require.Equal(t, orderCount, pl.Orders.Len())
+	}
+	// validate orders number per price level for asks
+	for price, orderCount := range tc.finalBookState.bidsShape {
+		pl, ok := book.bids.Get(PriceLevel{Price: price})
+		require.True(t, ok)
+		require.Equal(t, orderCount, pl.Orders.Len())
+	}
 }
 
 // Checks if top order from the appropriate resting side has correct remaining quantity
