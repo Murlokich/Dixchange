@@ -40,11 +40,11 @@ func (b *Book) AddOrder(order *Order) ([]Trade, error) {
 		if !order.IsSatisfactoryPrice(bestPriceLevel.Price) {
 			break
 		}
-		plTrades, err := b.createTradesForPriceLevel(bestPriceLevel, order, trades, oppositeSide)
+		var err error
+		trades, err = b.createTradesForPriceLevel(bestPriceLevel, order, trades, oppositeSide)
 		if err != nil {
-			return nil, errors.Wrap(err, "match price level")
+			return nil, errors.Wrap(err, "create trades for price level")
 		}
-		trades = append(trades, plTrades...)
 	}
 	// no more trades can be produced
 	if order.IsFilled() {
