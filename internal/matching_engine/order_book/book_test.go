@@ -12,10 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	orderType = "limit"
-)
-
 var (
 	noTrades = []Trade{}
 )
@@ -317,6 +313,53 @@ func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
 	testSteps(t, &tc)
 }
 
+// Create two orders on the same price level
+// Cancel both of them
+// Check that book is clear
+func TestBook_AddOrder_CancelOrder_PriceLevelRemoved(t *testing.T) {
+	const (
+		fixedPrice    = 100
+		fixedQuantity = 10
+	)
+
+	orderInputs := []orderInput{
+		{
+			side:     entity.SellAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		},
+		{
+			side:     entity.SellAction,
+			price:    fixedPrice,
+			quantity: fixedQuantity,
+		},
+	}
+
+	orders := prepOrders(orderInputs)
+	steps := make([]step, len(orders)*2)
+	for i := range len(orders) {
+		steps[i] = step{
+			order:      orders[i],
+			wantTrades: noTrades,
+		}
+	}
+	for i := range len(orders) {
+		steps[len(orders)+i] = step{
+			cancelID: &orders[i].ID,
+		}
+	}
+
+	tc := testCase{
+		steps: steps,
+		finalBookState: finalBookState{
+			asksShape: nil,
+			bidsShape: nil,
+			orderIDs:  nil,
+		},
+	}
+	testSteps(t, &tc)
+}
+
 // Create multiple buy/sell orders with not matching prices
 // Expected not to see any trades as a result
 func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
@@ -367,6 +410,30 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 		},
 	}
 	testSteps(t, &tc)
+}
+
+func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
+	book := NewBook(8)
+	id, err := uuid.NewV7()
+	require.NoError(t, err)
+	order := Order{
+		ID:                id,
+		OrderType:         LimitOrder,
+		Side:              entity.BuyAction,
+		Price:             80,
+		RemainingQuantity: 10,
+	}
+	trades, err := book.AddOrder(&order)
+	require.NoError(t, err)
+	require.Empty(t, trades)
+
+	ok, err := book.CancelOrder(order.ID)
+	require.NoError(t, err)
+	assert.True(t, ok)
+
+	ok, err = book.CancelOrder(order.ID)
+	require.NoError(t, err)
+	assert.False(t, ok)
 }
 
 // Main logic which checks order book state after each step and its final state
@@ -428,7 +495,7 @@ func prepOrders(orderInput []orderInput) []*Order {
 		id, _ := uuid.NewV7()
 		orders[i] = &Order{
 			ID:                id,
-			OrderType:         orderType,
+			OrderType:         LimitOrder,
 			Side:              orderInput[i].side,
 			Price:             orderInput[i].price,
 			RemainingQuantity: orderInput[i].quantity,
