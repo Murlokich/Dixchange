@@ -10,16 +10,21 @@ import (
 )
 
 type WalletRepository interface {
-	Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error
+	Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error
 }
 
 type MarketRepository interface {
-	SymbolExists(id int) bool
+	GetSymbol(id int) (entity.Symbol, bool)
+}
+
+type Converter interface {
+	ConvertAmountToInt(symbol entity.Symbol, amount decimal.Decimal) (int64, error)
 }
 
 type UseCase struct {
 	walletRepo WalletRepository
 	marketRepo MarketRepository
+	converter  Converter
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -27,16 +32,23 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
 
-	if !u.marketRepo.SymbolExists(input.SymbolID) {
+	symbol, ok := u.marketRepo.GetSymbol(input.SymbolID)
+
+	if !ok {
 		return Output{}, entity.ValidationError{Err: errors.New("market repo symbol doesn't exist")}
 	}
 
-	if err := u.walletRepo.Deposit(ctx, input.UserID, input.SymbolID, input.Amount); err != nil {
+	amountInt, err := u.converter.ConvertAmountToInt(symbol, input.Amount)
+	if err != nil {
+		return Output{}, errors.Wrap(err, "converter ConvertAmountToInt")
+	}
+
+	if err = u.walletRepo.Deposit(ctx, input.UserID, input.SymbolID, amountInt); err != nil {
 		return Output{}, errors.Wrap(err, "wallet repo deposit")
 	}
 	return Output{}, nil
 }
 
-func NewUseCase(walletRepo WalletRepository, marketRepo MarketRepository) *UseCase {
-	return &UseCase{walletRepo: walletRepo, marketRepo: marketRepo}
+func NewUseCase(walletRepo WalletRepository, marketRepo MarketRepository, converter Converter) *UseCase {
+	return &UseCase{walletRepo: walletRepo, marketRepo: marketRepo, converter: converter}
 }

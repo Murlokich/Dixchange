@@ -125,7 +125,7 @@ func (_m *MockWalletRepository) EXPECT() *MockWalletRepository_Expecter {
 }
 
 // ReserveFunds provides a mock function for the type MockWalletRepository
-func (_mock *MockWalletRepository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
+func (_mock *MockWalletRepository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error {
 	ret := _mock.Called(ctx, userID, symbolID, amount)
 
 	if len(ret) == 0 {
@@ -133,7 +133,7 @@ func (_mock *MockWalletRepository) ReserveFunds(ctx context.Context, userID uuid
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, decimal.Decimal) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int64) error); ok {
 		r0 = returnFunc(ctx, userID, symbolID, amount)
 	} else {
 		r0 = ret.Error(0)
@@ -150,12 +150,12 @@ type MockWalletRepository_ReserveFunds_Call struct {
 //   - ctx context.Context
 //   - userID uuid.UUID
 //   - symbolID int
-//   - amount decimal.Decimal
+//   - amount int64
 func (_e *MockWalletRepository_Expecter) ReserveFunds(ctx any, userID any, symbolID any, amount any) *MockWalletRepository_ReserveFunds_Call {
 	return &MockWalletRepository_ReserveFunds_Call{Call: _e.mock.On("ReserveFunds", ctx, userID, symbolID, amount)}
 }
 
-func (_c *MockWalletRepository_ReserveFunds_Call) Run(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal)) *MockWalletRepository_ReserveFunds_Call {
+func (_c *MockWalletRepository_ReserveFunds_Call) Run(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount int64)) *MockWalletRepository_ReserveFunds_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -169,9 +169,9 @@ func (_c *MockWalletRepository_ReserveFunds_Call) Run(run func(ctx context.Conte
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
-		var arg3 decimal.Decimal
+		var arg3 int64
 		if args[3] != nil {
-			arg3 = args[3].(decimal.Decimal)
+			arg3 = args[3].(int64)
 		}
 		run(
 			arg0,
@@ -188,7 +188,7 @@ func (_c *MockWalletRepository_ReserveFunds_Call) Return(err error) *MockWalletR
 	return _c
 }
 
-func (_c *MockWalletRepository_ReserveFunds_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error) *MockWalletRepository_ReserveFunds_Call {
+func (_c *MockWalletRepository_ReserveFunds_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error) *MockWalletRepository_ReserveFunds_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -221,7 +221,7 @@ func (_m *MockMarketRepository) EXPECT() *MockMarketRepository_Expecter {
 }
 
 // GetPair provides a mock function for the type MockMarketRepository
-func (_mock *MockMarketRepository) GetPair(id int) entity.Pair {
+func (_mock *MockMarketRepository) GetPair(id int) (entity.Pair, bool) {
 	ret := _mock.Called(id)
 
 	if len(ret) == 0 {
@@ -229,12 +229,21 @@ func (_mock *MockMarketRepository) GetPair(id int) entity.Pair {
 	}
 
 	var r0 entity.Pair
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(int) (entity.Pair, bool)); ok {
+		return returnFunc(id)
+	}
 	if returnFunc, ok := ret.Get(0).(func(int) entity.Pair); ok {
 		r0 = returnFunc(id)
 	} else {
 		r0 = ret.Get(0).(entity.Pair)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(int) bool); ok {
+		r1 = returnFunc(id)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
 }
 
 // MockMarketRepository_GetPair_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPair'
@@ -261,18 +270,18 @@ func (_c *MockMarketRepository_GetPair_Call) Run(run func(id int)) *MockMarketRe
 	return _c
 }
 
-func (_c *MockMarketRepository_GetPair_Call) Return(pair entity.Pair) *MockMarketRepository_GetPair_Call {
-	_c.Call.Return(pair)
+func (_c *MockMarketRepository_GetPair_Call) Return(pair entity.Pair, b bool) *MockMarketRepository_GetPair_Call {
+	_c.Call.Return(pair, b)
 	return _c
 }
 
-func (_c *MockMarketRepository_GetPair_Call) RunAndReturn(run func(id int) entity.Pair) *MockMarketRepository_GetPair_Call {
+func (_c *MockMarketRepository_GetPair_Call) RunAndReturn(run func(id int) (entity.Pair, bool)) *MockMarketRepository_GetPair_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetSymbol provides a mock function for the type MockMarketRepository
-func (_mock *MockMarketRepository) GetSymbol(id int) entity.Symbol {
+func (_mock *MockMarketRepository) GetSymbol(id int) (entity.Symbol, bool) {
 	ret := _mock.Called(id)
 
 	if len(ret) == 0 {
@@ -280,12 +289,21 @@ func (_mock *MockMarketRepository) GetSymbol(id int) entity.Symbol {
 	}
 
 	var r0 entity.Symbol
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(int) (entity.Symbol, bool)); ok {
+		return returnFunc(id)
+	}
 	if returnFunc, ok := ret.Get(0).(func(int) entity.Symbol); ok {
 		r0 = returnFunc(id)
 	} else {
 		r0 = ret.Get(0).(entity.Symbol)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(int) bool); ok {
+		r1 = returnFunc(id)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
 }
 
 // MockMarketRepository_GetSymbol_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSymbol'
@@ -312,63 +330,12 @@ func (_c *MockMarketRepository_GetSymbol_Call) Run(run func(id int)) *MockMarket
 	return _c
 }
 
-func (_c *MockMarketRepository_GetSymbol_Call) Return(symbol entity.Symbol) *MockMarketRepository_GetSymbol_Call {
-	_c.Call.Return(symbol)
+func (_c *MockMarketRepository_GetSymbol_Call) Return(symbol entity.Symbol, b bool) *MockMarketRepository_GetSymbol_Call {
+	_c.Call.Return(symbol, b)
 	return _c
 }
 
-func (_c *MockMarketRepository_GetSymbol_Call) RunAndReturn(run func(id int) entity.Symbol) *MockMarketRepository_GetSymbol_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PairExists provides a mock function for the type MockMarketRepository
-func (_mock *MockMarketRepository) PairExists(id int) bool {
-	ret := _mock.Called(id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PairExists")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(int) bool); ok {
-		r0 = returnFunc(id)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// MockMarketRepository_PairExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PairExists'
-type MockMarketRepository_PairExists_Call struct {
-	*mock.Call
-}
-
-// PairExists is a helper method to define mock.On call
-//   - id int
-func (_e *MockMarketRepository_Expecter) PairExists(id any) *MockMarketRepository_PairExists_Call {
-	return &MockMarketRepository_PairExists_Call{Call: _e.mock.On("PairExists", id)}
-}
-
-func (_c *MockMarketRepository_PairExists_Call) Run(run func(id int)) *MockMarketRepository_PairExists_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int
-		if args[0] != nil {
-			arg0 = args[0].(int)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMarketRepository_PairExists_Call) Return(b bool) *MockMarketRepository_PairExists_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *MockMarketRepository_PairExists_Call) RunAndReturn(run func(id int) bool) *MockMarketRepository_PairExists_Call {
+func (_c *MockMarketRepository_GetSymbol_Call) RunAndReturn(run func(id int) (entity.Symbol, bool)) *MockMarketRepository_GetSymbol_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -453,6 +420,105 @@ func (_c *MockTXManager_WithTX_Call) Return(err error) *MockTXManager_WithTX_Cal
 }
 
 func (_c *MockTXManager_WithTX_Call) RunAndReturn(run func(ctx context.Context, fn func(ctx context.Context) error) error) *MockTXManager_WithTX_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockConverter creates a new instance of MockConverter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockConverter(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockConverter {
+	mock := &MockConverter{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockConverter is an autogenerated mock type for the Converter type
+type MockConverter struct {
+	mock.Mock
+}
+
+type MockConverter_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockConverter) EXPECT() *MockConverter_Expecter {
+	return &MockConverter_Expecter{mock: &_m.Mock}
+}
+
+// DeriveOrderWithQuantitativeFields provides a mock function for the type MockConverter
+func (_mock *MockConverter) DeriveOrderWithQuantitativeFields(order entity.Order, quantity decimal.Decimal, price decimal.Decimal) (entity.Order, error) {
+	ret := _mock.Called(order, quantity, price)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeriveOrderWithQuantitativeFields")
+	}
+
+	var r0 entity.Order
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(entity.Order, decimal.Decimal, decimal.Decimal) (entity.Order, error)); ok {
+		return returnFunc(order, quantity, price)
+	}
+	if returnFunc, ok := ret.Get(0).(func(entity.Order, decimal.Decimal, decimal.Decimal) entity.Order); ok {
+		r0 = returnFunc(order, quantity, price)
+	} else {
+		r0 = ret.Get(0).(entity.Order)
+	}
+	if returnFunc, ok := ret.Get(1).(func(entity.Order, decimal.Decimal, decimal.Decimal) error); ok {
+		r1 = returnFunc(order, quantity, price)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockConverter_DeriveOrderWithQuantitativeFields_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeriveOrderWithQuantitativeFields'
+type MockConverter_DeriveOrderWithQuantitativeFields_Call struct {
+	*mock.Call
+}
+
+// DeriveOrderWithQuantitativeFields is a helper method to define mock.On call
+//   - order entity.Order
+//   - quantity decimal.Decimal
+//   - price decimal.Decimal
+func (_e *MockConverter_Expecter) DeriveOrderWithQuantitativeFields(order any, quantity any, price any) *MockConverter_DeriveOrderWithQuantitativeFields_Call {
+	return &MockConverter_DeriveOrderWithQuantitativeFields_Call{Call: _e.mock.On("DeriveOrderWithQuantitativeFields", order, quantity, price)}
+}
+
+func (_c *MockConverter_DeriveOrderWithQuantitativeFields_Call) Run(run func(order entity.Order, quantity decimal.Decimal, price decimal.Decimal)) *MockConverter_DeriveOrderWithQuantitativeFields_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 entity.Order
+		if args[0] != nil {
+			arg0 = args[0].(entity.Order)
+		}
+		var arg1 decimal.Decimal
+		if args[1] != nil {
+			arg1 = args[1].(decimal.Decimal)
+		}
+		var arg2 decimal.Decimal
+		if args[2] != nil {
+			arg2 = args[2].(decimal.Decimal)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConverter_DeriveOrderWithQuantitativeFields_Call) Return(order1 entity.Order, err error) *MockConverter_DeriveOrderWithQuantitativeFields_Call {
+	_c.Call.Return(order1, err)
+	return _c
+}
+
+func (_c *MockConverter_DeriveOrderWithQuantitativeFields_Call) RunAndReturn(run func(order entity.Order, quantity decimal.Decimal, price decimal.Decimal) (entity.Order, error)) *MockConverter_DeriveOrderWithQuantitativeFields_Call {
 	_c.Call.Return(run)
 	return _c
 }

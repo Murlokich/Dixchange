@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -22,9 +21,9 @@ type Order struct {
 	UserID          uuid.UUID
 	MarketPair      Pair
 	Action          string
-	QuantityOrdered decimal.Decimal
-	QuantityFilled  decimal.Decimal
-	PricePerUnit    decimal.Decimal
+	QuantityOrdered int64 // TODO: fix migration to int
+	QuantityFilled  int64 // TODO: fix migration to int
+	PricePerUnit    int64 // TODO: fix migration to int
 	Status          string
 	CreatedAt       time.Time
 	LastUpdatedAt   time.Time
@@ -52,9 +51,9 @@ func (o *Order) GetCreditAsset() (Symbol, error) {
 	return Symbol{}, errors.Errorf("invalid action value: %s", o.Action)
 }
 
-func (o *Order) GetDebitAmount() decimal.Decimal {
+func (o *Order) GetDebitAmount() int64 {
 	if o.Action == BuyAction {
-		return o.PricePerUnit.Mul(o.QuantityOrdered)
+		return o.PricePerUnit * o.QuantityOrdered
 	}
 	return o.QuantityOrdered
 }

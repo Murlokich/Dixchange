@@ -7,7 +7,6 @@ import (
 	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -35,7 +34,7 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord enti
 	return nil
 }
 
-func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
+func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
@@ -54,7 +53,7 @@ func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int
 	return nil
 }
 
-func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
+func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 

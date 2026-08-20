@@ -15,6 +15,7 @@ test: ## Run tests and display coverage
 
 gen: ## Generate code: sqlc
 	@sqlc generate
+	@mockery
 
 lint: ## Run linters
 	@golangci-lint run -v --timeout=5m ./...

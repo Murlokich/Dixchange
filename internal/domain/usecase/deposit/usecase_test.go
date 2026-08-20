@@ -5,6 +5,7 @@ import (
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	"github.com/dixchange/Monolith/internal/market/service"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
@@ -16,11 +17,13 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 
 	walletRepo := deposit.NewMockWalletRepository(t)
 	marketRepo := deposit.NewMockMarketRepository(t)
+	converter := deposit.NewMockConverter(t)
 
-	marketRepo.EXPECT().SymbolExists(validSymbolID).Return(true).Once()
-	walletRepo.EXPECT().Deposit(mock.Anything, validUUID, validSymbolID, validAmountDecimal).Return(nil).Once()
+	marketRepo.EXPECT().GetSymbol(validSymbolID).Return(entity.Symbol{}, true).Once()
+	converter.EXPECT().ConvertAmountToInt(entity.Symbol{}, validAmountDecimal).Return(int64(validAmount), nil).Once()
+	walletRepo.EXPECT().Deposit(mock.Anything, validUUID, validSymbolID, int64(validAmount)).Return(nil).Once()
 
-	uc := deposit.NewUseCase(walletRepo, marketRepo)
+	uc := deposit.NewUseCase(walletRepo, marketRepo, converter)
 	output, err := uc.Execute(t.Context(), deposit.Input{
 		UserID:   validUUID,
 		SymbolID: validSymbolID,
@@ -29,6 +32,57 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, deposit.Output{}, output)
+}
+
+// TestUseCase_Execute_ConvertsAmountUsingSymbolPrecision uses the real converter (not a mock) to
+// check that a decimal amount is actually scaled to the symbol's precision before it reaches the
+// wallet repository, rather than just checking the usecase forwards whatever the converter
+// happens to return.
+func TestUseCase_Execute_ConvertsAmountUsingSymbolPrecision(t *testing.T) {
+	t.Parallel()
+
+	symbol := entity.Symbol{ID: validSymbolID, Code: "KCN", Precision: 2}
+	amount := decimal.RequireFromString("10.56") // exactly matches the symbol's precision
+	const expectedAmount = int64(1056)           // shifted by 2
+
+	walletRepo := deposit.NewMockWalletRepository(t)
+	marketRepo := deposit.NewMockMarketRepository(t)
+
+	marketRepo.EXPECT().GetSymbol(validSymbolID).Return(symbol, true).Once()
+	walletRepo.EXPECT().Deposit(mock.Anything, validUUID, validSymbolID, expectedAmount).Return(nil).Once()
+
+	uc := deposit.NewUseCase(walletRepo, marketRepo, &service.Converter{})
+	_, err := uc.Execute(t.Context(), deposit.Input{
+		UserID:   validUUID,
+		SymbolID: validSymbolID,
+		Amount:   amount,
+	})
+
+	require.NoError(t, err)
+}
+
+// TestUseCase_Execute_RejectsAmountWithExcessPrecision uses the real converter to check that an
+// amount with more decimal places than the symbol supports is rejected rather than silently
+// truncated, and that the wallet repository is never reached in that case.
+func TestUseCase_Execute_RejectsAmountWithExcessPrecision(t *testing.T) {
+	t.Parallel()
+
+	symbol := entity.Symbol{ID: validSymbolID, Code: "KCN", Precision: 2}
+	amount := decimal.RequireFromString("10.567") // one digit past the symbol's precision
+
+	walletRepo := deposit.NewMockWalletRepository(t)
+	marketRepo := deposit.NewMockMarketRepository(t)
+
+	marketRepo.EXPECT().GetSymbol(validSymbolID).Return(symbol, true).Once()
+
+	uc := deposit.NewUseCase(walletRepo, marketRepo, &service.Converter{})
+	_, err := uc.Execute(t.Context(), deposit.Input{
+		UserID:   validUUID,
+		SymbolID: validSymbolID,
+		Amount:   amount,
+	})
+
+	require.ErrorContains(t, err, "more decimal places")
 }
 
 func TestUseCase_Execute_InvalidInput(t *testing.T) {
@@ -53,8 +107,9 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 			// calls them, proving Validate short-circuits Execute.
 			walletRepo := deposit.NewMockWalletRepository(t)
 			marketRepo := deposit.NewMockMarketRepository(t)
+			converter := deposit.NewMockConverter(t)
 
-			uc := deposit.NewUseCase(walletRepo, marketRepo)
+			uc := deposit.NewUseCase(walletRepo, marketRepo, converter)
 			_, err := uc.Execute(t.Context(), deposit.Input{
 				UserID:   tc.userID,
 				SymbolID: tc.symbolID,
@@ -72,10 +127,11 @@ func TestUseCase_Execute_SymbolDoesNotExist(t *testing.T) {
 
 	walletRepo := deposit.NewMockWalletRepository(t)
 	marketRepo := deposit.NewMockMarketRepository(t)
+	converter := deposit.NewMockConverter(t)
 
-	marketRepo.EXPECT().SymbolExists(validSymbolID).Return(false).Once()
+	marketRepo.EXPECT().GetSymbol(validSymbolID).Return(entity.Symbol{}, false).Once()
 
-	uc := deposit.NewUseCase(walletRepo, marketRepo)
+	uc := deposit.NewUseCase(walletRepo, marketRepo, converter)
 	_, err := uc.Execute(t.Context(), deposit.Input{
 		UserID:   validUUID,
 		SymbolID: validSymbolID,

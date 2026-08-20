@@ -7,6 +7,7 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -18,17 +19,28 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	walletRepo := createorder.NewMockWalletRepository(t)
 	marketRepo := createorder.NewMockMarketRepository(t)
 	txManager := createorder.NewMockTXManager(t)
+	converter := createorder.NewMockConverter(t)
 
 	pair := entity.Pair{
 		ID:    validMarketPairID,
-		Base:  entity.Symbol{ID: 1, Code: "KCN"},
-		Quote: entity.Symbol{ID: 2, Code: "USD"},
+		Base:  entity.Symbol{ID: 1, Code: "KCN", Precision: 8},
+		Quote: entity.Symbol{ID: 2, Code: "USD", Precision: 2},
 	}
 	// buy debits the quote asset
-	wantTotalPrice := validPriceDecimal.Mul(validQuantityDecimal)
+	wantTotalPrice := validPricePerUnit * validQuantityOrdered
 
-	marketRepo.EXPECT().PairExists(validMarketPairID).Return(true).Once()
-	marketRepo.EXPECT().GetPair(validMarketPairID).Return(pair).Once()
+	marketRepo.EXPECT().GetPair(validMarketPairID).Return(pair, true).Once()
+
+	// the conversion math itself is covered by the converter's own tests; here we just
+	// pass the quantitative fields through so the rest of the usecase can be exercised.
+	converter.EXPECT().
+		DeriveOrderWithQuantitativeFields(mock.Anything, validQuantityDecimal, validPriceDecimal).
+		RunAndReturn(func(order entity.Order, _ decimal.Decimal, _ decimal.Decimal) (entity.Order, error) {
+			order.QuantityOrdered = validQuantityOrdered
+			order.PricePerUnit = validPricePerUnit
+			return order, nil
+		}).
+		Once()
 
 	walletRepo.EXPECT().
 		ReserveFunds(mock.Anything, validUUID, pair.Quote.ID, wantTotalPrice).
@@ -41,8 +53,8 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 				order.UserID == validUUID &&
 				order.MarketPair == pair &&
 				order.Action == entity.BuyAction &&
-				order.QuantityOrdered.Equal(validQuantityDecimal) &&
-				order.PricePerUnit.Equal(validPriceDecimal) &&
+				order.QuantityOrdered == validQuantityOrdered &&
+				order.PricePerUnit == validPricePerUnit &&
 				order.Status == entity.StatusOpen
 		})).
 		Return(nil).
@@ -55,7 +67,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 		}).
 		Once()
 
-	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager)
+	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter)
 	output, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
@@ -90,8 +102,9 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 			walletRepo := createorder.NewMockWalletRepository(t)
 			marketRepo := createorder.NewMockMarketRepository(t)
 			txManager := createorder.NewMockTXManager(t)
+			converter := createorder.NewMockConverter(t)
 
-			uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager)
+			uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter)
 			_, err := uc.Execute(t.Context(), createorder.Input{
 				UserID:          tc.userID,
 				MarketPairID:    validMarketPairID,
@@ -113,10 +126,11 @@ func TestUseCase_Execute_PairDoesNotExist(t *testing.T) {
 	walletRepo := createorder.NewMockWalletRepository(t)
 	marketRepo := createorder.NewMockMarketRepository(t)
 	txManager := createorder.NewMockTXManager(t)
+	converter := createorder.NewMockConverter(t)
 
-	marketRepo.EXPECT().PairExists(validMarketPairID).Return(false).Once()
+	marketRepo.EXPECT().GetPair(validMarketPairID).Return(entity.Pair{}, false).Once()
 
-	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager)
+	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter)
 	_, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,

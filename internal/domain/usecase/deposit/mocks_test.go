@@ -7,6 +7,7 @@ package deposit
 import (
 	"context"
 
+	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	mock "github.com/stretchr/testify/mock"
@@ -40,7 +41,7 @@ func (_m *MockWalletRepository) EXPECT() *MockWalletRepository_Expecter {
 }
 
 // Deposit provides a mock function for the type MockWalletRepository
-func (_mock *MockWalletRepository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error {
+func (_mock *MockWalletRepository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error {
 	ret := _mock.Called(ctx, userID, symbolID, amount)
 
 	if len(ret) == 0 {
@@ -48,7 +49,7 @@ func (_mock *MockWalletRepository) Deposit(ctx context.Context, userID uuid.UUID
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, decimal.Decimal) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, int, int64) error); ok {
 		r0 = returnFunc(ctx, userID, symbolID, amount)
 	} else {
 		r0 = ret.Error(0)
@@ -65,12 +66,12 @@ type MockWalletRepository_Deposit_Call struct {
 //   - ctx context.Context
 //   - userID uuid.UUID
 //   - symbolID int
-//   - amount decimal.Decimal
+//   - amount int64
 func (_e *MockWalletRepository_Expecter) Deposit(ctx any, userID any, symbolID any, amount any) *MockWalletRepository_Deposit_Call {
 	return &MockWalletRepository_Deposit_Call{Call: _e.mock.On("Deposit", ctx, userID, symbolID, amount)}
 }
 
-func (_c *MockWalletRepository_Deposit_Call) Run(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal)) *MockWalletRepository_Deposit_Call {
+func (_c *MockWalletRepository_Deposit_Call) Run(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount int64)) *MockWalletRepository_Deposit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -84,9 +85,9 @@ func (_c *MockWalletRepository_Deposit_Call) Run(run func(ctx context.Context, u
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
-		var arg3 decimal.Decimal
+		var arg3 int64
 		if args[3] != nil {
-			arg3 = args[3].(decimal.Decimal)
+			arg3 = args[3].(int64)
 		}
 		run(
 			arg0,
@@ -103,7 +104,7 @@ func (_c *MockWalletRepository_Deposit_Call) Return(err error) *MockWalletReposi
 	return _c
 }
 
-func (_c *MockWalletRepository_Deposit_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error) *MockWalletRepository_Deposit_Call {
+func (_c *MockWalletRepository_Deposit_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error) *MockWalletRepository_Deposit_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -135,35 +136,44 @@ func (_m *MockMarketRepository) EXPECT() *MockMarketRepository_Expecter {
 	return &MockMarketRepository_Expecter{mock: &_m.Mock}
 }
 
-// SymbolExists provides a mock function for the type MockMarketRepository
-func (_mock *MockMarketRepository) SymbolExists(id int) bool {
+// GetSymbol provides a mock function for the type MockMarketRepository
+func (_mock *MockMarketRepository) GetSymbol(id int) (entity.Symbol, bool) {
 	ret := _mock.Called(id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SymbolExists")
+		panic("no return value specified for GetSymbol")
 	}
 
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(int) bool); ok {
+	var r0 entity.Symbol
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(int) (entity.Symbol, bool)); ok {
+		return returnFunc(id)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int) entity.Symbol); ok {
 		r0 = returnFunc(id)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(entity.Symbol)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(int) bool); ok {
+		r1 = returnFunc(id)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
 }
 
-// MockMarketRepository_SymbolExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SymbolExists'
-type MockMarketRepository_SymbolExists_Call struct {
+// MockMarketRepository_GetSymbol_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSymbol'
+type MockMarketRepository_GetSymbol_Call struct {
 	*mock.Call
 }
 
-// SymbolExists is a helper method to define mock.On call
+// GetSymbol is a helper method to define mock.On call
 //   - id int
-func (_e *MockMarketRepository_Expecter) SymbolExists(id any) *MockMarketRepository_SymbolExists_Call {
-	return &MockMarketRepository_SymbolExists_Call{Call: _e.mock.On("SymbolExists", id)}
+func (_e *MockMarketRepository_Expecter) GetSymbol(id any) *MockMarketRepository_GetSymbol_Call {
+	return &MockMarketRepository_GetSymbol_Call{Call: _e.mock.On("GetSymbol", id)}
 }
 
-func (_c *MockMarketRepository_SymbolExists_Call) Run(run func(id int)) *MockMarketRepository_SymbolExists_Call {
+func (_c *MockMarketRepository_GetSymbol_Call) Run(run func(id int)) *MockMarketRepository_GetSymbol_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 int
 		if args[0] != nil {
@@ -176,12 +186,105 @@ func (_c *MockMarketRepository_SymbolExists_Call) Run(run func(id int)) *MockMar
 	return _c
 }
 
-func (_c *MockMarketRepository_SymbolExists_Call) Return(b bool) *MockMarketRepository_SymbolExists_Call {
-	_c.Call.Return(b)
+func (_c *MockMarketRepository_GetSymbol_Call) Return(symbol entity.Symbol, b bool) *MockMarketRepository_GetSymbol_Call {
+	_c.Call.Return(symbol, b)
 	return _c
 }
 
-func (_c *MockMarketRepository_SymbolExists_Call) RunAndReturn(run func(id int) bool) *MockMarketRepository_SymbolExists_Call {
+func (_c *MockMarketRepository_GetSymbol_Call) RunAndReturn(run func(id int) (entity.Symbol, bool)) *MockMarketRepository_GetSymbol_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockConverter creates a new instance of MockConverter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockConverter(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockConverter {
+	mock := &MockConverter{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockConverter is an autogenerated mock type for the Converter type
+type MockConverter struct {
+	mock.Mock
+}
+
+type MockConverter_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockConverter) EXPECT() *MockConverter_Expecter {
+	return &MockConverter_Expecter{mock: &_m.Mock}
+}
+
+// ConvertAmountToInt provides a mock function for the type MockConverter
+func (_mock *MockConverter) ConvertAmountToInt(symbol entity.Symbol, amount decimal.Decimal) (int64, error) {
+	ret := _mock.Called(symbol, amount)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConvertAmountToInt")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(entity.Symbol, decimal.Decimal) (int64, error)); ok {
+		return returnFunc(symbol, amount)
+	}
+	if returnFunc, ok := ret.Get(0).(func(entity.Symbol, decimal.Decimal) int64); ok {
+		r0 = returnFunc(symbol, amount)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(entity.Symbol, decimal.Decimal) error); ok {
+		r1 = returnFunc(symbol, amount)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockConverter_ConvertAmountToInt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConvertAmountToInt'
+type MockConverter_ConvertAmountToInt_Call struct {
+	*mock.Call
+}
+
+// ConvertAmountToInt is a helper method to define mock.On call
+//   - symbol entity.Symbol
+//   - amount decimal.Decimal
+func (_e *MockConverter_Expecter) ConvertAmountToInt(symbol any, amount any) *MockConverter_ConvertAmountToInt_Call {
+	return &MockConverter_ConvertAmountToInt_Call{Call: _e.mock.On("ConvertAmountToInt", symbol, amount)}
+}
+
+func (_c *MockConverter_ConvertAmountToInt_Call) Run(run func(symbol entity.Symbol, amount decimal.Decimal)) *MockConverter_ConvertAmountToInt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 entity.Symbol
+		if args[0] != nil {
+			arg0 = args[0].(entity.Symbol)
+		}
+		var arg1 decimal.Decimal
+		if args[1] != nil {
+			arg1 = args[1].(decimal.Decimal)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockConverter_ConvertAmountToInt_Call) Return(n int64, err error) *MockConverter_ConvertAmountToInt_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockConverter_ConvertAmountToInt_Call) RunAndReturn(run func(symbol entity.Symbol, amount decimal.Decimal) (int64, error)) *MockConverter_ConvertAmountToInt_Call {
 	_c.Call.Return(run)
 	return _c
 }
