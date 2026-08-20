@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 const createBalanceRecord = `-- name: CreateBalanceRecord :exec
@@ -32,7 +31,7 @@ UPDATE wallet.balance SET main = main + $1 WHERE user_id = $2 AND symbol_id = $3
 `
 
 type DepositParams struct {
-	Main     decimal.Decimal
+	Main     int64
 	UserID   uuid.UUID
 	SymbolID int32
 }
@@ -53,7 +52,7 @@ WHERE user_id = $2 AND symbol_id = $3 AND main >= $1
 `
 
 type ReserveFundsParams struct {
-	Main     decimal.Decimal
+	Main     int64
 	UserID   uuid.UUID
 	SymbolID int32
 }

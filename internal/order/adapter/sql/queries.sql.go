@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 const createOrder = `-- name: CreateOrder :exec
@@ -22,8 +21,8 @@ type CreateOrderParams struct {
 	UserID          uuid.UUID
 	MarketPairID    int32
 	Action          OrderAction
-	QuantityOrdered decimal.Decimal
-	Price           decimal.Decimal
+	QuantityOrdered int64
+	Price           int64
 	Status          string
 }
 

@@ -70,20 +70,12 @@ func (c *DBCache) GetDefaultSymbols() []entity.Symbol {
 	return c.defaultSymbols
 }
 
-func (c *DBCache) GetPair(id int) entity.Pair {
-	return c.market[id]
+func (c *DBCache) GetPair(id int) (entity.Pair, bool) {
+	p, ok := c.market[id]
+	return p, ok
 }
 
-func (c *DBCache) GetSymbol(id int) entity.Symbol {
-	return c.symbols[id]
-}
-
-func (c *DBCache) PairExists(id int) bool {
-	_, ok := c.market[id]
-	return ok
-}
-
-func (c *DBCache) SymbolExists(id int) bool {
-	_, ok := c.symbols[id]
-	return ok
+func (c *DBCache) GetSymbol(id int) (entity.Symbol, bool) {
+	s, ok := c.symbols[id]
+	return s, ok
 }

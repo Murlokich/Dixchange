@@ -28,7 +28,6 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - godot
     - gomoddirectives
     - goprintffuncname
     - gosec
@@ -65,7 +64,6 @@ linters:
     - staticcheck
     - testableexamples
     - testifylint
-    - testpackage
     - tparallel
     - unconvert
     - unparam

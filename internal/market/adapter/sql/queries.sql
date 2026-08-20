@@ -4,7 +4,11 @@ SELECT
     p.base_currency AS base_currency_id,
     b.code AS base_currency_code,
     p.quote_currency AS quote_currency_id,
-    q.code AS quote_currency_code 
+    q.code AS quote_currency_code,
+    p.lot_size AS lot_size,
+    p.price_tick AS price_tick,
+    b.precision AS base_precision,
+    q.precision AS quote_precision
 FROM 
     market.pair p   
 JOIN 

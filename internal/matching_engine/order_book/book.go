@@ -27,7 +27,7 @@ type Book struct {
 }
 
 // Matches the orders and forms the trades; If Order cannot be fully filled immediately
-// appends it to the appropriate resting queue
+// appends it to the appropriate resting queue.
 func (b *Book) AddOrder(order *Order) ([]Trade, error) {
 	trades := make([]Trade, 0)
 	oppositeSide := b.oppositeSide(order.Side)
@@ -84,7 +84,7 @@ func NewBook(b int) *Book {
 	}
 }
 
-// returns pointer to the requested side
+// returns pointer to the requested side.
 func (b *Book) sameSide(side string) bookSide {
 	if side == entity.BuyAction {
 		return b.bids
@@ -92,7 +92,7 @@ func (b *Book) sameSide(side string) bookSide {
 	return b.asks
 }
 
-// returns pointer to the opposite of the requested side
+// returns pointer to the opposite of the requested side.
 func (b *Book) oppositeSide(side string) bookSide {
 	if side == entity.BuyAction {
 		return b.asks
@@ -101,7 +101,7 @@ func (b *Book) oppositeSide(side string) bookSide {
 }
 
 // Takes resting order and new one and creates trade with
-// min quanity and resting order's price and updates the orders state
+// min quanity and resting order's price and updates the orders state.
 func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 	var askOrder, bidOrder *Order
 	// determine which order is ask and bid
@@ -149,8 +149,13 @@ func (b *Book) insertRestingOrder(order *Order) {
 }
 
 // Iterates over price level and creates trades; created for main matching function simplification;
-// Must be used only on already matched price level (this function doesn't intend to check matching condition)
-func (b *Book) createTradesForPriceLevel(bestPriceLevel PriceLevel, order *Order, trades []Trade, oppositeSide bookSide) ([]Trade, error) {
+// Must be used only on already matched price level (this function doesn't intend to check matching condition).
+func (b *Book) createTradesForPriceLevel(
+	bestPriceLevel PriceLevel,
+	order *Order,
+	trades []Trade,
+	oppositeSide bookSide,
+) ([]Trade, error) {
 	// iterate within price level
 	for bestPriceLevel.Orders.Len() > 0 && !order.IsFilled() {
 		// extract first order in the queue

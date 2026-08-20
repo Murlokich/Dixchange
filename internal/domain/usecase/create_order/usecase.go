@@ -14,17 +14,24 @@ type OrderRepository interface {
 }
 
 type WalletRepository interface {
-	ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount decimal.Decimal) error
+	ReserveFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error
 }
 
 type MarketRepository interface {
-	GetPair(id int) entity.Pair
-	GetSymbol(id int) entity.Symbol
-	PairExists(id int) bool
+	GetPair(id int) (entity.Pair, bool)
+	GetSymbol(id int) (entity.Symbol, bool)
 }
 
 type TXManager interface {
 	WithTX(ctx context.Context, fn func(ctx context.Context) error) (err error)
+}
+
+type Converter interface {
+	DeriveOrderWithQuantitativeFields(
+		order entity.Order,
+		quantity decimal.Decimal,
+		price decimal.Decimal,
+	) (entity.Order, error)
 }
 
 type UseCase struct {
@@ -32,6 +39,7 @@ type UseCase struct {
 	walletRepo WalletRepository
 	marketRepo MarketRepository
 	txManager  TXManager
+	converter  Converter
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -70,19 +78,29 @@ func (u *UseCase) inputToOrder(input Input) (entity.Order, error) {
 	if err != nil {
 		return entity.Order{}, errors.Wrap(err, "gen order id")
 	}
-	if !u.marketRepo.PairExists(input.MarketPairID) {
+	pair, ok := u.marketRepo.GetPair(input.MarketPairID)
+	if !ok {
 		return entity.Order{}, entity.ValidationError{Err: errors.New("market repo pair doesn't exist")}
 	}
 
-	return entity.Order{
-		ID:              id,
-		UserID:          input.UserID,
-		MarketPair:      u.marketRepo.GetPair(input.MarketPairID),
-		Action:          input.Action,
-		QuantityOrdered: input.QuantityOrdered,
-		PricePerUnit:    input.PricePerUnit,
-		Status:          entity.StatusOpen,
-	}, nil
+	orderWithoutQuantitativeFields := entity.Order{
+		ID:         id,
+		UserID:     input.UserID,
+		MarketPair: pair,
+		Action:     input.Action,
+		Status:     entity.StatusOpen,
+	}
+
+	fullOrder, err := u.converter.DeriveOrderWithQuantitativeFields(
+		orderWithoutQuantitativeFields,
+		input.QuantityOrdered,
+		input.PricePerUnit,
+	)
+	if err != nil {
+		return entity.Order{}, errors.Wrap(err, "converter DeriveOrderWithQuantitativeFields")
+	}
+
+	return fullOrder, nil
 }
 
 func NewUseCase(
@@ -90,11 +108,13 @@ func NewUseCase(
 	walletRepo WalletRepository,
 	marketRepo MarketRepository,
 	txManager TXManager,
+	converter Converter,
 ) *UseCase {
 	return &UseCase{
 		orderRepo:  repo,
 		walletRepo: walletRepo,
 		marketRepo: marketRepo,
 		txManager:  txManager,
+		converter:  converter,
 	}
 }

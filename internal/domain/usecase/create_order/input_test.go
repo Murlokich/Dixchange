@@ -14,12 +14,13 @@ const (
 	validUserID       = "019f7f2c-0caa-70ab-b1ec-414f744c3e33"
 	validMarketPairID = 1
 
-	validQuantityOrdered = 5
-	validPricePerUnit    = 10
+	validQuantityOrdered int64 = 5
+	validPricePerUnit    int64 = 10
 )
 
 var (
-	validUUID            = uuid.MustParse(validUserID)              //nolint:gochecknoglobals // acceptable in test
+	validUUID = uuid.MustParse(validUserID) //nolint:gochecknoglobals // acceptable in test
+
 	validQuantityDecimal = decimal.NewFromInt(validQuantityOrdered) //nolint:gochecknoglobals // acceptable in test
 	validPriceDecimal    = decimal.NewFromInt(validPricePerUnit)    //nolint:gochecknoglobals // acceptable in test
 )

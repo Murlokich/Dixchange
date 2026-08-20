@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	noTrades = []Trade{}
+	noTrades = []Trade{} //nolint:gochecknoglobals // acceptable in test
 )
 
 type testCase struct {
@@ -43,7 +43,7 @@ type orderInput struct {
 
 // This test inserts 9 sell orders across three different price leves: [78, 79, 80]
 // Then appends big limit order with price 81 - having exceeding quantity over all existing orders
-// Expected to match all the appended orders, clear the order book and keep single resting buying order
+// Expected to match all the appended orders, clear the order book and keep single resting buying order.
 func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 	orderInputs := []orderInput{
 		{
@@ -136,7 +136,7 @@ func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 
 // Create one big buy order
 // Create multiple small sell orders to match big one
-// End with two non-matching orders and remaining big one
+// End with two non-matching orders and remaining big one.
 func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 	orderInputs := []orderInput{
 		{
@@ -208,7 +208,7 @@ func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 }
 
 // Create multiple resting orders on the same price level
-// Validate that orders are filled in FIFO order
+// Validate that orders are filled in FIFO order.
 func TestBook_AddOrder_FIFO(t *testing.T) {
 	const (
 		fixedPrice          = 100
@@ -271,7 +271,7 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 
 // Create two orders on the same price level
 // Cancel one of the orders
-// Check that price level remained
+// Check that price level remained.
 func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
 	const (
 		fixedPrice    = 100
@@ -293,7 +293,7 @@ func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
 
 	orders := prepOrders(orderInputs)
 	steps := make([]step, len(orders)+1)
-	for i := range len(orders) {
+	for i := range orders {
 		steps[i] = step{
 			order:      orders[i],
 			wantTrades: noTrades,
@@ -315,7 +315,7 @@ func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
 
 // Create two orders on the same price level
 // Cancel both of them
-// Check that book is clear
+// Check that book is clear.
 func TestBook_AddOrder_CancelOrder_PriceLevelRemoved(t *testing.T) {
 	const (
 		fixedPrice    = 100
@@ -337,13 +337,13 @@ func TestBook_AddOrder_CancelOrder_PriceLevelRemoved(t *testing.T) {
 
 	orders := prepOrders(orderInputs)
 	steps := make([]step, len(orders)*2)
-	for i := range len(orders) {
+	for i := range orders {
 		steps[i] = step{
 			order:      orders[i],
 			wantTrades: noTrades,
 		}
 	}
-	for i := range len(orders) {
+	for i := range orders {
 		steps[len(orders)+i] = step{
 			cancelID: &orders[i].ID,
 		}
@@ -361,7 +361,7 @@ func TestBook_AddOrder_CancelOrder_PriceLevelRemoved(t *testing.T) {
 }
 
 // Create multiple buy/sell orders with not matching prices
-// Expected not to see any trades as a result
+// Expected not to see any trades as a result.
 func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 	const fixedQuantity = 10
 
@@ -387,7 +387,7 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 	}
 	orders := prepOrders(orderInputs)
 	steps := make([]step, ordersPerSideNumber*2)
-	for i := range len(steps) {
+	for i := range steps {
 		steps[i] = step{
 			order:      orders[i],
 			wantTrades: noTrades,
@@ -398,7 +398,7 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 		bidsShape[price] = 2
 	}
 	orderIDs := make([]uuid.UUID, len(orders))
-	for i := range len(orders) {
+	for i := range orders {
 		orderIDs[i] = orders[i].ID
 	}
 	tc := testCase{
@@ -436,7 +436,7 @@ func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// Main logic which checks order book state after each step and its final state
+// Main logic which checks order book state after each step and its final state.
 func testSteps(t *testing.T, tc *testCase) {
 	book := NewBook(8)
 

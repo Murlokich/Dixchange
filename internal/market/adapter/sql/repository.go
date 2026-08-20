@@ -30,13 +30,17 @@ func rowsToPairs(rows []GetPairsRow) []entity.Pair {
 		pairs[i] = entity.Pair{
 			ID: int(rows[i].PairID),
 			Base: entity.Symbol{
-				ID:   int(rows[i].BaseCurrencyID),
-				Code: rows[i].BaseCurrencyCode,
+				ID:        int(rows[i].BaseCurrencyID),
+				Code:      rows[i].BaseCurrencyCode,
+				Precision: int(rows[i].BasePrecision),
 			},
 			Quote: entity.Symbol{
-				ID:   int(rows[i].QuoteCurrencyID),
-				Code: rows[i].QuoteCurrencyCode,
+				ID:        int(rows[i].QuoteCurrencyID),
+				Code:      rows[i].QuoteCurrencyCode,
+				Precision: int(rows[i].QuotePrecision),
 			},
+			LotSize:   rows[i].LotSize,
+			PriceTick: rows[i].PriceTick,
 		}
 	}
 	return pairs

@@ -118,11 +118,12 @@ func main() {
 		log.Errorf("create jwt manager: %v", err)
 		return
 	}
+	converter := service.NewConverter()
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
-	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache)
-	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager)
+	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache, converter)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter)
 
 	deps := api.Dependencies{
 		Logger:         log,
