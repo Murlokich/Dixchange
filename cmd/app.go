@@ -18,6 +18,9 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
 	"github.com/dixchange/Monolith/internal/market/service"
+	bookwriter "github.com/dixchange/Monolith/internal/matching_engine/book_writer"
+	"github.com/dixchange/Monolith/internal/matching_engine/engine"
+	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
 	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
@@ -119,11 +122,20 @@ func main() {
 		return
 	}
 	converter := service.NewConverter()
+	orderBook := orderbook.NewBook(&cfg.OrderBook)
+	bookWriter := bookwriter.NewBookWriter(&cfg.BookWriterConfig)
+
+	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, log)
+
+	// Start matching engine before any traffic comes in
+	go func() {
+		matchingEngine.Run(ctx)
+	}()
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache, converter)
-	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter, bookWriter)
 
 	deps := api.Dependencies{
 		Logger:         log,
