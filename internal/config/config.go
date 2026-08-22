@@ -1,11 +1,14 @@
 package config
 
-type Config struct {
-	HTTPConfig HTTPConfig `envconfig:"HTTP"`
-	DBConfig   DBConfig   `envconfig:"DB"`
+import "time"
 
-	Argon2Config Argon2Config `envconfig:"ARGON2"`
-	JWTConfig    JWTConfig    `envconfig:"JWT"`
+type Config struct {
+	HTTPConfig       HTTPConfig       `envconfig:"HTTP"`
+	DBConfig         DBConfig         `envconfig:"DB"`
+	Argon2Config     Argon2Config     `envconfig:"ARGON2"`
+	JWTConfig        JWTConfig        `envconfig:"JWT"`
+	BookWriterConfig BookWriterConfig `envconfig:"BOOK_WRITER"`
+	OrderBook        OrderBook        `envconfig:"ORDER_BOOK"`
 }
 
 type HTTPConfig struct {
@@ -32,4 +35,13 @@ type JWTConfig struct {
 	Audience      string `default:"monolith-api"`
 	PublicKeyB64  string `split_words:"true"`
 	PrivateKeyB64 string `split_words:"true"`
+}
+
+type OrderBook struct {
+	B int `default:"8"`
+}
+
+type BookWriterConfig struct {
+	BufferSize   int           `default:"100" split_words:"true"`
+	WriteTimeout time.Duration `default:"100ms" split_words:"true"`
 }

@@ -34,12 +34,17 @@ type Converter interface {
 	) (entity.Order, error)
 }
 
+type BookWriter interface {
+	InsertOrder(ctx context.Context, entityOrder entity.Order) error
+}
+
 type UseCase struct {
 	orderRepo  OrderRepository
 	walletRepo WalletRepository
 	marketRepo MarketRepository
 	txManager  TXManager
 	converter  Converter
+	bookWriter BookWriter
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -63,6 +68,9 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		}
 		if err = u.orderRepo.CreateOrder(ctx, order); err != nil {
 			return errors.Wrap(err, "repo create order")
+		}
+		if err = u.bookWriter.InsertOrder(ctx, order); err != nil {
+			return errors.Wrap(err, "bookWriter insert order")
 		}
 		return nil
 	}
@@ -109,6 +117,7 @@ func NewUseCase(
 	marketRepo MarketRepository,
 	txManager TXManager,
 	converter Converter,
+	bookWriter BookWriter,
 ) *UseCase {
 	return &UseCase{
 		orderRepo:  repo,
@@ -116,5 +125,6 @@ func NewUseCase(
 		marketRepo: marketRepo,
 		txManager:  txManager,
 		converter:  converter,
+		bookWriter: bookWriter,
 	}
 }
