@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/btree"
 	"github.com/google/uuid"
@@ -76,10 +77,10 @@ func (b *Book) CancelOrder(id uuid.UUID) (bool, error) {
 	return true, nil
 }
 
-func NewBook(b int) *Book {
+func NewBook(cfg *config.OrderBook) *Book {
 	return &Book{
-		asks:   &asks{btree.NewG[PriceLevel](b, less)},
-		bids:   &bids{btree.NewG[PriceLevel](b, less)},
+		asks:   &asks{btree.NewG[PriceLevel](cfg.B, less)},
+		bids:   &bids{btree.NewG[PriceLevel](cfg.B, less)},
 		orders: make(map[uuid.UUID]deletableNode),
 	}
 }

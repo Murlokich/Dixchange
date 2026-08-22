@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -413,7 +414,7 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 }
 
 func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
-	book := NewBook(8)
+	book := NewBook(&config.OrderBook{B: 8})
 	id, err := uuid.NewV7()
 	require.NoError(t, err)
 	order := Order{
@@ -438,7 +439,7 @@ func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
 
 // Main logic which checks order book state after each step and its final state.
 func testSteps(t *testing.T, tc *testCase) {
-	book := NewBook(8)
+	book := NewBook(&config.OrderBook{B: 8})
 
 	for i, step := range tc.steps {
 		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {
