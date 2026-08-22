@@ -111,9 +111,9 @@ func main() {
 		log.Errorf("create market db cache: %v", err)
 		return
 	}
-	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
+	pwdHasher := argon2.NewArgon2(&cfg.Argon2Config)
 	txManager := pkg.NewTXManager(postgresPool)
-	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
+	jwtManager, err := jwt.NewManager(&cfg.JWTConfig)
 	if err != nil {
 		log.Errorf("create jwt manager: %v", err)
 		return

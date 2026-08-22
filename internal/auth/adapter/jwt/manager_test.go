@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
-	"github.com/dixchange/Monolith/internal/auth/config"
+	"github.com/dixchange/Monolith/internal/config"
 	jwtlib "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
