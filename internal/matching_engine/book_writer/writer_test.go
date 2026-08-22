@@ -2,7 +2,6 @@ package bookwriter
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -94,7 +93,7 @@ func TestBookWriter_InsertOrder_RespectsWriteTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.GreaterOrEqual(t, elapsed, writeTimeout)
 
 	// The only order that made it into the queue is the first one.
@@ -107,7 +106,7 @@ func TestBookWriter_InsertOrder_RespectsWriteTimeout(t *testing.T) {
 	retrieveCtx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel2()
 	_, err = writer.RetrieveOrder(retrieveCtx2)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded), "queue must be empty: second order was never written")
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 // InsertOrder blocks on a full queue; cancelling the caller's context from
@@ -127,7 +126,7 @@ func TestBookWriter_InsertOrder_ReturnsErrorWhenContextCancelledExternally(t *te
 
 	select {
 	case err := <-errCh:
-		assert.True(t, errors.Is(err, context.Canceled))
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(testTimeout):
 		t.Fatal("InsertOrder did not return after context was cancelled")
 	}
@@ -150,7 +149,7 @@ func TestBookWriter_RetrieveOrder_ReturnsErrorWhenContextCancelledExternally(t *
 
 	select {
 	case err := <-errCh:
-		assert.True(t, errors.Is(err, context.Canceled))
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(testTimeout):
 		t.Fatal("RetrieveOrder did not return after context was cancelled")
 	}
