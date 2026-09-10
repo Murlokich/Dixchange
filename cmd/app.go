@@ -22,6 +22,9 @@ import (
 	"github.com/dixchange/Monolith/internal/matching_engine/engine"
 	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
+	tradeSQL "github.com/dixchange/Monolith/internal/trade/adapter/sql"
+	tradeservice "github.com/dixchange/Monolith/internal/trade/service"
+	tradewriter "github.com/dixchange/Monolith/internal/trade/trade_writer"
 	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
 
@@ -109,6 +112,7 @@ func main() {
 	balanceRepo := walletSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketRepo := marketSQL.NewRepository(postgresPool, pkg.GetDB)
 	orderRepo := orderSQL.NewRepository(postgresPool, pkg.GetDB)
+	tradeRepo := tradeSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketCache, err := service.NewDBCache(ctx, marketRepo)
 	if err != nil {
 		log.Errorf("create market db cache: %v", err)
@@ -122,14 +126,19 @@ func main() {
 		return
 	}
 	converter := service.NewConverter()
-	orderBook := orderbook.NewBook(&cfg.OrderBook)
+	orderBook := orderbook.NewBook(&cfg.OrderBookConfig)
 	bookWriter := bookwriter.NewBookWriter(&cfg.BookWriterConfig)
+	tradeWriter := tradewriter.NewTradeWriter(&cfg.TradeWriterConfig)
 
-	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, log)
+	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, tradeWriter, log)
+	tradeService := tradeservice.NewTradeService(tradeWriter, tradeRepo, txManager, log)
 
-	// Start matching engine before any traffic comes in
+	// Start matching engine and trade service before any traffic comes in
 	go func() {
 		matchingEngine.Run(ctx)
+	}()
+	go func() {
+		tradeService.Run(ctx)
 	}()
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)

@@ -3,12 +3,13 @@ package config
 import "time"
 
 type Config struct {
-	HTTPConfig       HTTPConfig       `envconfig:"HTTP"`
-	DBConfig         DBConfig         `envconfig:"DB"`
-	Argon2Config     Argon2Config     `envconfig:"ARGON2"`
-	JWTConfig        JWTConfig        `envconfig:"JWT"`
-	BookWriterConfig BookWriterConfig `envconfig:"BOOK_WRITER"`
-	OrderBook        OrderBook        `envconfig:"ORDER_BOOK"`
+	HTTPConfig        HTTPConfig        `envconfig:"HTTP"`
+	DBConfig          DBConfig          `envconfig:"DB"`
+	Argon2Config      Argon2Config      `envconfig:"ARGON2"`
+	JWTConfig         JWTConfig         `envconfig:"JWT"`
+	BookWriterConfig  BookWriterConfig  `envconfig:"BOOK_WRITER"`
+	OrderBookConfig   OrderBook         `envconfig:"ORDER_BOOK"`
+	TradeWriterConfig TradeWriterConfig `envconfig:"TRADE_WRITER"`
 }
 
 type HTTPConfig struct {
@@ -44,4 +45,8 @@ type OrderBook struct {
 type BookWriterConfig struct {
 	BufferSize   int           `default:"100" split_words:"true"`
 	WriteTimeout time.Duration `default:"100ms" split_words:"true"`
+}
+
+type TradeWriterConfig struct {
+	BufferSize int `default:"100" split_words:"true"`
 }
