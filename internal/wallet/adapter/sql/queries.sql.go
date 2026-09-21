@@ -44,6 +44,27 @@ func (q *Queries) Deposit(ctx context.Context, arg DepositParams) (int64, error)
 	return result.RowsAffected(), nil
 }
 
+const releaseReservedFunds = `-- name: ReleaseReservedFunds :execrows
+UPDATE wallet.balance
+SET reserved = reserved - $1,
+    main = main + $1
+WHERE user_id = $2 AND symbol_id = $3 AND reserved >= $1
+`
+
+type ReleaseReservedFundsParams struct {
+	Reserved int64
+	UserID   uuid.UUID
+	SymbolID int32
+}
+
+func (q *Queries) ReleaseReservedFunds(ctx context.Context, arg ReleaseReservedFundsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseReservedFunds, arg.Reserved, arg.UserID, arg.SymbolID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const reserveFunds = `-- name: ReserveFunds :execrows
 UPDATE wallet.balance
 SET main = main - $1,

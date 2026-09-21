@@ -72,6 +72,33 @@ func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolI
 	return nil
 }
 
+// ReleaseReservedFunds moves amount of the symbol from the user reserved funds back
+// to their main funds. It is the inverse of ReserveFunds.
+func (r *Repository) ReleaseReservedFunds(
+	ctx context.Context,
+	userID uuid.UUID,
+	symbolID int,
+	amount int64,
+) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.ReleaseReservedFunds(ctx, ReleaseReservedFundsParams{
+		Reserved: amount,
+		UserID:   userID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID: int32(symbolID),
+	})
+	if err != nil {
+		return errors.Wrap(err, "query release reserved funds")
+	}
+	if rows == noUserAffected {
+		return entity.ErrInsufficientBalance
+	}
+
+	return nil
+}
+
 // TransferFunds moves amount of the symbol from the payer reserved funds to the payee
 // main funds. Both legs are applied by a single query, so the payee is credited only
 // when the payer had enough funds reserved.

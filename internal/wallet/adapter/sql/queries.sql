@@ -10,6 +10,12 @@ SET main = main - $1,
     reserved = reserved + $1
 WHERE user_id = $2 AND symbol_id = $3 AND main >= $1;
 
+-- name: ReleaseReservedFunds :execrows
+UPDATE wallet.balance
+SET reserved = reserved - $1,
+    main = main + $1
+WHERE user_id = $2 AND symbol_id = $3 AND reserved >= $1;
+
 -- name: TransferFunds :execrows
 WITH debited AS (
     UPDATE wallet.balance payer

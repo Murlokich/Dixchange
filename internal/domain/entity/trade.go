@@ -12,6 +12,9 @@ import (
 type TradeParty struct {
 	OrderID uuid.UUID
 	UserID  uuid.UUID
+	// OrderPrice is the price the order was placed at, which is not necessarily the
+	// price the trade executed at: a trade takes the resting order price.
+	OrderPrice int64
 }
 
 type Trade struct {

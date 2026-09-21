@@ -118,8 +118,16 @@ func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 	wantTrades := make([]Trade, len(matchOrder))
 	for i, idx := range matchOrder {
 		wantTrades[i] = Trade{
-			Ask:      entity.TradeParty{OrderID: orders[idx].ID, UserID: orders[idx].UserID},
-			Bid:      entity.TradeParty{OrderID: orders[9].ID, UserID: orders[9].UserID},
+			Ask: entity.TradeParty{
+				OrderID:    orders[idx].ID,
+				UserID:     orders[idx].UserID,
+				OrderPrice: orders[idx].Price,
+			},
+			Bid: entity.TradeParty{
+				OrderID:    orders[9].ID,
+				UserID:     orders[9].UserID,
+				OrderPrice: orders[9].Price,
+			},
 			Price:    orderInputs[idx].price,
 			Quantity: orderInputs[idx].quantity,
 		}
@@ -193,8 +201,16 @@ func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 			order: orders[i],
 			wantTrades: []Trade{
 				{
-					Ask:      entity.TradeParty{OrderID: orders[i].ID, UserID: orders[i].UserID},
-					Bid:      entity.TradeParty{OrderID: orders[0].ID, UserID: orders[0].UserID},
+					Ask: entity.TradeParty{
+						OrderID:    orders[i].ID,
+						UserID:     orders[i].UserID,
+						OrderPrice: orders[i].Price,
+					},
+					Bid: entity.TradeParty{
+						OrderID:    orders[0].ID,
+						UserID:     orders[0].UserID,
+						OrderPrice: orders[0].Price,
+					},
 					Price:    orders[0].Price,
 					Quantity: orders[i].RemainingQuantity,
 				},
@@ -257,10 +273,15 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 			wantTrades: []Trade{
 				{
 					Ask: entity.TradeParty{
-						OrderID: orders[ordersPerSideNumber+i].ID,
-						UserID:  orders[ordersPerSideNumber+i].UserID,
+						OrderID:    orders[ordersPerSideNumber+i].ID,
+						UserID:     orders[ordersPerSideNumber+i].UserID,
+						OrderPrice: orders[ordersPerSideNumber+i].Price,
 					},
-					Bid:      entity.TradeParty{OrderID: orders[i].ID, UserID: orders[i].UserID},
+					Bid: entity.TradeParty{
+						OrderID:    orders[i].ID,
+						UserID:     orders[i].UserID,
+						OrderPrice: orders[i].Price,
+					},
 					Price:    fixedPrice,
 					Quantity: fixedQuantity,
 				},

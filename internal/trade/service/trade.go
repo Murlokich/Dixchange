@@ -24,6 +24,7 @@ type OrderRepository interface {
 
 type WalletRepository interface {
 	TransferFunds(ctx context.Context, fromUserID, toUserID uuid.UUID, symbolID int, amount int64) error
+	ReleaseReservedFunds(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error
 }
 
 type TXManager interface {
@@ -100,6 +101,10 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 			return pkgerrors.Wrap(err, "wallet repo transfer base funds")
 		}
 
+		if err := s.releaseExcessReservation(ctx, trade); err != nil {
+			return pkgerrors.Wrap(err, "release excess reservation")
+		}
+
 		if err := s.orderRepo.FillOrder(ctx, trade.Bid.OrderID, trade.Quantity); err != nil {
 			return pkgerrors.Wrap(err, "order repo fill bid order")
 		}
@@ -112,6 +117,29 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 
 	if err := s.txManager.WithTX(ctx, fn); err != nil {
 		return pkgerrors.Wrap(err, "tx manager with tx")
+	}
+
+	return nil
+}
+
+// releaseExcessReservation returns the funds the buyer reserved on top of what the
+// trade actually cost. A buy order reserves the quote asset at its own price, but the
+// trade executes at the resting order price, which is never higher - the difference
+// would stay locked otherwise. Only the bid side can hold a remainder: sellers reserve
+// the base asset in quantity units, which a fill consumes exactly.
+func (s *TradeService) releaseExcessReservation(ctx context.Context, trade entity.Trade) error {
+	excessPerUnit := trade.Bid.OrderPrice - trade.Price
+	if excessPerUnit <= 0 {
+		return nil
+	}
+
+	if err := s.walletRepo.ReleaseReservedFunds(
+		ctx,
+		trade.Bid.UserID,
+		trade.MarketPair.Quote.ID,
+		excessPerUnit*trade.Quantity,
+	); err != nil {
+		return pkgerrors.Wrap(err, "wallet repo release reserved funds")
 	}
 
 	return nil

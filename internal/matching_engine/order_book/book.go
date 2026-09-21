@@ -130,8 +130,16 @@ func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 		return Trade{}, errors.Wrap(err, "new order fill")
 	}
 	return Trade{
-		Ask:      entity.TradeParty{OrderID: askOrder.ID, UserID: askOrder.UserID},
-		Bid:      entity.TradeParty{OrderID: bidOrder.ID, UserID: bidOrder.UserID},
+		Ask: entity.TradeParty{
+			OrderID:    askOrder.ID,
+			UserID:     askOrder.UserID,
+			OrderPrice: askOrder.Price,
+		},
+		Bid: entity.TradeParty{
+			OrderID:    bidOrder.ID,
+			UserID:     bidOrder.UserID,
+			OrderPrice: bidOrder.Price,
+		},
 		Price:    restingOrder.Price,
 		Quantity: tradeQuantity,
 	}, nil
