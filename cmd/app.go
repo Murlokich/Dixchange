@@ -42,6 +42,8 @@ import (
 
 const (
 	gracefulShutdownTime = 5 * time.Second
+	// TODO: run a book per market pair instead of a single hardcoded one.
+	defaultMarketPairID = 1
 )
 
 func runMigrations(dbConfig *config.DBConfig) error {
@@ -126,7 +128,12 @@ func main() {
 		return
 	}
 	converter := service.NewConverter()
-	orderBook := orderbook.NewBook(&cfg.OrderBookConfig)
+	defaultPair, ok := marketCache.GetPair(defaultMarketPairID)
+	if !ok {
+		log.Errorf("market cache pair %d doesn't exist", defaultMarketPairID)
+		return
+	}
+	orderBook := orderbook.NewBook(&cfg.OrderBookConfig, defaultPair)
 	bookWriter := bookwriter.NewBookWriter(&cfg.BookWriterConfig)
 	tradeWriter := tradewriter.NewTradeWriter(&cfg.TradeWriterConfig)
 
@@ -136,7 +143,6 @@ func main() {
 		tradeRepo,
 		orderRepo,
 		balanceRepo,
-		marketCache,
 		txManager,
 		log,
 	)

@@ -19,8 +19,8 @@ func (r *Repository) CreateTrade(ctx context.Context, trade entity.Trade) error 
 
 	if err := q.CreateTrade(ctx, CreateTradeParams{
 		ID:          trade.ID,
-		BuyOrderID:  trade.BidOrderID,
-		SellOrderID: trade.AskOrderID,
+		BuyOrderID:  trade.Bid.OrderID,
+		SellOrderID: trade.Ask.OrderID,
 		Price:       trade.Price,
 		Quantity:    trade.Quantity,
 	}); err != nil {

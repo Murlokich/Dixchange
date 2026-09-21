@@ -22,9 +22,17 @@ type deletableNode struct {
 }
 
 type Book struct {
+	// A book matches a single market pair, so the pair is held once here instead of
+	// being repeated on every order and trade.
+	pair   entity.Pair
 	asks   *asks
 	bids   *bids
 	orders map[uuid.UUID]deletableNode // reverse lookup map to list nodes stored in price levels of asks/bids
+}
+
+// Pair returns the market pair this book matches.
+func (b *Book) Pair() entity.Pair {
+	return b.pair
 }
 
 // Matches the orders and forms the trades; If Order cannot be fully filled immediately
@@ -77,8 +85,9 @@ func (b *Book) CancelOrder(id uuid.UUID) (bool, error) {
 	return true, nil
 }
 
-func NewBook(cfg *config.OrderBook) *Book {
+func NewBook(cfg *config.OrderBook, pair entity.Pair) *Book {
 	return &Book{
+		pair:   pair,
 		asks:   &asks{btree.NewG[PriceLevel](cfg.B, less)},
 		bids:   &bids{btree.NewG[PriceLevel](cfg.B, less)},
 		orders: make(map[uuid.UUID]deletableNode),
@@ -121,10 +130,10 @@ func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 		return Trade{}, errors.Wrap(err, "new order fill")
 	}
 	return Trade{
-		AskOrderID: askOrder.ID,
-		BidOrderID: bidOrder.ID,
-		Price:      restingOrder.Price,
-		Quantity:   tradeQuantity,
+		Ask:      entity.TradeParty{OrderID: askOrder.ID, UserID: askOrder.UserID},
+		Bid:      entity.TradeParty{OrderID: bidOrder.ID, UserID: bidOrder.UserID},
+		Price:    restingOrder.Price,
+		Quantity: tradeQuantity,
 	}, nil
 }
 

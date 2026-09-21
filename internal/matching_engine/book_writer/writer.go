@@ -15,7 +15,7 @@ type BookWriter struct {
 }
 
 func (w *BookWriter) InsertOrder(ctx context.Context, entityOrder entity.Order) error {
-	order := entityToBookOrder(entityOrder)
+	order := orderbook.NewOrderFromEntity(entityOrder)
 	ctx, cancel := context.WithTimeout(ctx, w.writeTimeout)
 	defer cancel()
 
@@ -33,16 +33,6 @@ func (w *BookWriter) RetrieveOrder(ctx context.Context) (orderbook.Order, error)
 		return order, nil
 	case <-ctx.Done():
 		return orderbook.Order{}, ctx.Err()
-	}
-}
-
-func entityToBookOrder(order entity.Order) orderbook.Order {
-	return orderbook.Order{
-		ID:                order.ID,
-		OrderType:         orderbook.LimitOrder,
-		Side:              order.Action,
-		Price:             order.PricePerUnit,
-		RemainingQuantity: order.QuantityOrdered,
 	}
 }
 

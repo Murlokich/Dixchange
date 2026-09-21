@@ -14,7 +14,14 @@ import (
 )
 
 var (
-	noTrades = []Trade{} //nolint:gochecknoglobals // acceptable in test
+	noTrades = []Trade{}    //nolint:gochecknoglobals // acceptable in test
+	testPair = entity.Pair{ //nolint:gochecknoglobals // acceptable in test
+		ID:        1,
+		Base:      entity.Symbol{ID: 1, Code: "USD", Precision: 2},
+		Quote:     entity.Symbol{ID: 2, Code: "KCN", Precision: 0},
+		LotSize:   1,
+		PriceTick: 1,
+	}
 )
 
 type testCase struct {
@@ -111,10 +118,10 @@ func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 	wantTrades := make([]Trade, len(matchOrder))
 	for i, idx := range matchOrder {
 		wantTrades[i] = Trade{
-			AskOrderID: orders[idx].ID,
-			BidOrderID: orders[9].ID,
-			Price:      orderInputs[idx].price,
-			Quantity:   orderInputs[idx].quantity,
+			Ask:      entity.TradeParty{OrderID: orders[idx].ID, UserID: orders[idx].UserID},
+			Bid:      entity.TradeParty{OrderID: orders[9].ID, UserID: orders[9].UserID},
+			Price:    orderInputs[idx].price,
+			Quantity: orderInputs[idx].quantity,
 		}
 	}
 	steps[9] = step{
@@ -186,10 +193,10 @@ func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 			order: orders[i],
 			wantTrades: []Trade{
 				{
-					AskOrderID: orders[i].ID,
-					BidOrderID: orders[0].ID,
-					Price:      orders[0].Price,
-					Quantity:   orders[i].RemainingQuantity,
+					Ask:      entity.TradeParty{OrderID: orders[i].ID, UserID: orders[i].UserID},
+					Bid:      entity.TradeParty{OrderID: orders[0].ID, UserID: orders[0].UserID},
+					Price:    orders[0].Price,
+					Quantity: orders[i].RemainingQuantity,
 				},
 			},
 			topBidQuantity: &bigOrderRemainingQuantity[i-3],
@@ -249,10 +256,13 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 			order: orders[ordersPerSideNumber+i],
 			wantTrades: []Trade{
 				{
-					AskOrderID: orders[ordersPerSideNumber+i].ID,
-					BidOrderID: orders[i].ID,
-					Price:      fixedPrice,
-					Quantity:   fixedQuantity,
+					Ask: entity.TradeParty{
+						OrderID: orders[ordersPerSideNumber+i].ID,
+						UserID:  orders[ordersPerSideNumber+i].UserID,
+					},
+					Bid:      entity.TradeParty{OrderID: orders[i].ID, UserID: orders[i].UserID},
+					Price:    fixedPrice,
+					Quantity: fixedQuantity,
 				},
 			},
 		}
@@ -414,7 +424,7 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 }
 
 func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
-	book := NewBook(&config.OrderBook{B: 8})
+	book := NewBook(&config.OrderBook{B: 8}, testPair)
 	id, err := uuid.NewV7()
 	require.NoError(t, err)
 	order := Order{
@@ -439,7 +449,7 @@ func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
 
 // Main logic which checks order book state after each step and its final state.
 func testSteps(t *testing.T, tc *testCase) {
-	book := NewBook(&config.OrderBook{B: 8})
+	book := NewBook(&config.OrderBook{B: 8}, testPair)
 
 	for i, step := range tc.steps {
 		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {

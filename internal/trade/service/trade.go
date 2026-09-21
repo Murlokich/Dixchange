@@ -19,16 +19,11 @@ type TradeRepository interface {
 }
 
 type OrderRepository interface {
-	GetOrder(ctx context.Context, orderID uuid.UUID) (entity.Order, error)
 	FillOrder(ctx context.Context, orderID uuid.UUID, quantity int64) error
 }
 
 type WalletRepository interface {
 	TransferFunds(ctx context.Context, fromUserID, toUserID uuid.UUID, symbolID int, amount int64) error
-}
-
-type MarketRepository interface {
-	GetPair(id int) (entity.Pair, bool)
 }
 
 type TXManager interface {
@@ -40,7 +35,6 @@ type TradeService struct {
 	tradeRepo   TradeRepository
 	orderRepo   OrderRepository
 	walletRepo  WalletRepository
-	marketRepo  MarketRepository
 	txManager   TXManager
 	logger      pkg.Logger
 }
@@ -81,49 +75,35 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 	trade.ID = id
 
 	fn := func(ctx context.Context) error {
-		bidOrder, err := s.orderRepo.GetOrder(ctx, trade.BidOrderID)
-		if err != nil {
-			return pkgerrors.Wrap(err, "order repo get bid order")
-		}
-		askOrder, err := s.orderRepo.GetOrder(ctx, trade.AskOrderID)
-		if err != nil {
-			return pkgerrors.Wrap(err, "order repo get ask order")
-		}
-
-		pair, ok := s.marketRepo.GetPair(bidOrder.MarketPair.ID)
-		if !ok {
-			return pkgerrors.Errorf("market repo pair %d doesn't exist", bidOrder.MarketPair.ID)
-		}
-
-		if err = s.tradeRepo.CreateTrade(ctx, trade); err != nil {
+		if err := s.tradeRepo.CreateTrade(ctx, trade); err != nil {
 			return pkgerrors.Wrap(err, "trade repo create trade")
 		}
 
 		// The buyer pays the quote asset, the seller pays the base asset. Both were
 		// reserved when the orders were created.
-		if err = s.walletRepo.TransferFunds(
+		if err := s.walletRepo.TransferFunds(
 			ctx,
-			bidOrder.UserID,
-			askOrder.UserID,
-			pair.Quote.ID,
+			trade.Bid.UserID,
+			trade.Ask.UserID,
+			trade.MarketPair.Quote.ID,
 			trade.Price*trade.Quantity,
 		); err != nil {
 			return pkgerrors.Wrap(err, "wallet repo transfer quote funds")
 		}
-		if err = s.walletRepo.TransferFunds(
+		if err := s.walletRepo.TransferFunds(
 			ctx,
-			askOrder.UserID,
-			bidOrder.UserID,
-			pair.Base.ID,
+			trade.Ask.UserID,
+			trade.Bid.UserID,
+			trade.MarketPair.Base.ID,
 			trade.Quantity,
 		); err != nil {
 			return pkgerrors.Wrap(err, "wallet repo transfer base funds")
 		}
 
-		if err = s.orderRepo.FillOrder(ctx, trade.BidOrderID, trade.Quantity); err != nil {
+		if err := s.orderRepo.FillOrder(ctx, trade.Bid.OrderID, trade.Quantity); err != nil {
 			return pkgerrors.Wrap(err, "order repo fill bid order")
 		}
-		if err = s.orderRepo.FillOrder(ctx, trade.AskOrderID, trade.Quantity); err != nil {
+		if err := s.orderRepo.FillOrder(ctx, trade.Ask.OrderID, trade.Quantity); err != nil {
 			return pkgerrors.Wrap(err, "order repo fill ask order")
 		}
 
@@ -142,7 +122,6 @@ func NewTradeService(
 	tradeRepo TradeRepository,
 	orderRepo OrderRepository,
 	walletRepo WalletRepository,
-	marketRepo MarketRepository,
 	txManager TXManager,
 	logger pkg.Logger,
 ) *TradeService {
@@ -151,7 +130,6 @@ func NewTradeService(
 		tradeRepo:   tradeRepo,
 		orderRepo:   orderRepo,
 		walletRepo:  walletRepo,
-		marketRepo:  marketRepo,
 		txManager:   txManager,
 		logger:      logger,
 	}

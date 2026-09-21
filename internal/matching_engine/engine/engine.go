@@ -11,6 +11,7 @@ import (
 
 type OrderBook interface {
 	AddOrder(order *orderbook.Order) ([]orderbook.Trade, error)
+	Pair() entity.Pair
 }
 
 type BookWriter interface {
@@ -46,7 +47,7 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 			loggerWithOrderID.Errorf("bookWriter Retrieve order: %v", err)
 			continue
 		}
-		entityTrades := orderbookToEntityTrades(trades)
+		entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
 		if err = m.tradeWriter.InsertTrades(ctx, entityTrades); err != nil {
 			if errors.Is(err, context.Canceled) {
 				// TODO: graceful shutdown
@@ -71,12 +72,15 @@ func NewMatchingEngine(
 	}
 }
 
-func orderbookToEntityTrades(trades []orderbook.Trade) []entity.Trade {
+// The book matches a single pair, so the pair is stamped onto every trade it produced
+// instead of being carried by each order and trade inside the book.
+func orderbookToEntityTrades(trades []orderbook.Trade, pair entity.Pair) []entity.Trade {
 	entityTrades := make([]entity.Trade, len(trades))
 	for i := range trades {
 		entityTrades[i] = entity.Trade{
-			AskOrderID: trades[i].AskOrderID,
-			BidOrderID: trades[i].BidOrderID,
+			MarketPair: pair,
+			Ask:        trades[i].Ask,
+			Bid:        trades[i].Bid,
 			Price:      trades[i].Price,
 			Quantity:   trades[i].Quantity,
 		}

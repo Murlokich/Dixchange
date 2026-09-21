@@ -17,6 +17,7 @@ var (
 
 type Order struct {
 	ID                uuid.UUID
+	UserID            uuid.UUID
 	OrderType         string
 	Side              string
 	Price             int64
@@ -45,6 +46,7 @@ func (o *Order) IsFilled() bool {
 func NewOrderFromEntity(order entity.Order) Order {
 	return Order{
 		ID:                order.ID,
+		UserID:            order.UserID,
 		OrderType:         LimitOrder,
 		Side:              order.Action,
 		Price:             order.PricePerUnit,
