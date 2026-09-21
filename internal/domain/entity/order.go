@@ -21,9 +21,9 @@ type Order struct {
 	UserID          uuid.UUID
 	MarketPair      Pair
 	Action          string
-	QuantityOrdered int64 // TODO: fix migration to int
-	QuantityFilled  int64 // TODO: fix migration to int
-	PricePerUnit    int64 // TODO: fix migration to int
+	QuantityOrdered int64
+	QuantityFilled  int64
+	PricePerUnit    int64
 	Status          string
 	CreatedAt       time.Time
 	LastUpdatedAt   time.Time

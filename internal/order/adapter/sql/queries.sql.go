@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createOrder = `-- name: CreateOrder :exec
@@ -37,4 +38,61 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 		arg.Status,
 	)
 	return err
+}
+
+const fillOrder = `-- name: FillOrder :execrows
+UPDATE "order"."order"
+SET quantity_filled = COALESCE(quantity_filled, 0) + $1::bigint,
+    status = CASE
+        WHEN COALESCE(quantity_filled, 0) + $1::bigint >= quantity_ordered THEN 'filled'
+        ELSE status
+    END,
+    last_updated_at = NOW()
+WHERE id = $2
+`
+
+type FillOrderParams struct {
+	Quantity int64
+	OrderID  uuid.UUID
+}
+
+func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, fillOrder, arg.Quantity, arg.OrderID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getOrder = `-- name: GetOrder :one
+SELECT id, user_id, market_pair_id, action, quantity_ordered, quantity_filled, price, status
+FROM "order"."order"
+WHERE id = $1
+`
+
+type GetOrderRow struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	MarketPairID    int32
+	Action          OrderAction
+	QuantityOrdered int64
+	QuantityFilled  pgtype.Int8
+	Price           int64
+	Status          string
+}
+
+func (q *Queries) GetOrder(ctx context.Context, orderID uuid.UUID) (GetOrderRow, error) {
+	row := q.db.QueryRow(ctx, getOrder, orderID)
+	var i GetOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MarketPairID,
+		&i.Action,
+		&i.QuantityOrdered,
+		&i.QuantityFilled,
+		&i.Price,
+		&i.Status,
+	)
+	return i, err
 }

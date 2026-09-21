@@ -72,6 +72,36 @@ func (r *Repository) ReserveFunds(ctx context.Context, userID uuid.UUID, symbolI
 	return nil
 }
 
+// TransferFunds moves amount of the symbol from the payer reserved funds to the payee
+// main funds. Both legs are applied by a single query, so the payee is credited only
+// when the payer had enough funds reserved.
+func (r *Repository) TransferFunds(
+	ctx context.Context,
+	fromUserID uuid.UUID,
+	toUserID uuid.UUID,
+	symbolID int,
+	amount int64,
+) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.TransferFunds(ctx, TransferFundsParams{
+		Amount:     amount,
+		FromUserID: fromUserID,
+		ToUserID:   toUserID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID: int32(symbolID),
+	})
+	if err != nil {
+		return errors.Wrap(err, "query transfer funds")
+	}
+	if rows == noUserAffected {
+		return entity.ErrInsufficientBalance
+	}
+
+	return nil
+}
+
 func NewRepository(db DBTX, txGetter pkg.TXGetter) *Repository {
 	return &Repository{db: db, txGetter: txGetter}
 }

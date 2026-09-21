@@ -7,16 +7,30 @@ package sql
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
-const createTrades = `-- name: CreateTrades :exec
+const createTrade = `-- name: CreateTrade :exec
 INSERT INTO trade.trade (id, buy_order_id, sell_order_id, price, quantity)
-    SELECT id, buy_order_id, sell_order_id, price, quantity
-    FROM jsonb_to_recordset($1::jsonb)
-        AS t(id uuid, buy_order_id uuid, sell_order_id uuid, price bigint, quantity bigint)
+    VALUES ($1, $2, $3, $4, $5)
 `
 
-func (q *Queries) CreateTrades(ctx context.Context, trades []byte) error {
-	_, err := q.db.Exec(ctx, createTrades, trades)
+type CreateTradeParams struct {
+	ID          uuid.UUID
+	BuyOrderID  uuid.UUID
+	SellOrderID uuid.UUID
+	Price       int64
+	Quantity    int64
+}
+
+func (q *Queries) CreateTrade(ctx context.Context, arg CreateTradeParams) error {
+	_, err := q.db.Exec(ctx, createTrade,
+		arg.ID,
+		arg.BuyOrderID,
+		arg.SellOrderID,
+		arg.Price,
+		arg.Quantity,
+	)
 	return err
 }

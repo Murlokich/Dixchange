@@ -131,7 +131,15 @@ func main() {
 	tradeWriter := tradewriter.NewTradeWriter(&cfg.TradeWriterConfig)
 
 	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, tradeWriter, log)
-	tradeService := tradeservice.NewTradeService(tradeWriter, tradeRepo, txManager, log)
+	tradeService := tradeservice.NewTradeService(
+		tradeWriter,
+		tradeRepo,
+		orderRepo,
+		balanceRepo,
+		marketCache,
+		txManager,
+		log,
+	)
 
 	// Start matching engine and trade service before any traffic comes in
 	go func() {

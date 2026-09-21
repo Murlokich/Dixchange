@@ -5,7 +5,12 @@ import (
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/pkg"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
+)
+
+const (
+	noOrderAffected = 0
 )
 
 type Repository struct {
@@ -33,6 +38,49 @@ func (r *Repository) CreateOrder(ctx context.Context, order entity.Order) error 
 		Status:          order.Status,
 	}); err != nil {
 		return errors.Wrap(err, "query create order")
+	}
+
+	return nil
+}
+
+// GetOrder returns the stored order. The market pair is only identified by its ID,
+// the rest of the pair data is served from the market cache.
+func (r *Repository) GetOrder(ctx context.Context, orderID uuid.UUID) (entity.Order, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	row, err := q.GetOrder(ctx, orderID)
+	if err != nil {
+		return entity.Order{}, errors.Wrap(err, "query get order")
+	}
+
+	return entity.Order{
+		ID:              row.ID,
+		UserID:          row.UserID,
+		MarketPair:      entity.Pair{ID: int(row.MarketPairID)},
+		Action:          string(row.Action),
+		QuantityOrdered: row.QuantityOrdered,
+		QuantityFilled:  row.QuantityFilled.Int64,
+		PricePerUnit:    row.Price,
+		Status:          row.Status,
+	}, nil
+}
+
+// FillOrder adds quantity to the filled quantity of the order and marks it filled
+// once the ordered quantity is reached.
+func (r *Repository) FillOrder(ctx context.Context, orderID uuid.UUID, quantity int64) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.FillOrder(ctx, FillOrderParams{
+		Quantity: quantity,
+		OrderID:  orderID,
+	})
+	if err != nil {
+		return errors.Wrap(err, "query fill order")
+	}
+	if rows == noOrderAffected {
+		return errors.Errorf("order %s to fill doesn't exist", orderID)
 	}
 
 	return nil

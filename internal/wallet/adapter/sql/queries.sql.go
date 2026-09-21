@@ -45,7 +45,7 @@ func (q *Queries) Deposit(ctx context.Context, arg DepositParams) (int64, error)
 }
 
 const reserveFunds = `-- name: ReserveFunds :execrows
-UPDATE wallet.balance 
+UPDATE wallet.balance
 SET main = main - $1,
     reserved = reserved + $1
 WHERE user_id = $2 AND symbol_id = $3 AND main >= $1
@@ -59,6 +59,42 @@ type ReserveFundsParams struct {
 
 func (q *Queries) ReserveFunds(ctx context.Context, arg ReserveFundsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, reserveFunds, arg.Main, arg.UserID, arg.SymbolID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const transferFunds = `-- name: TransferFunds :execrows
+WITH debited AS (
+    UPDATE wallet.balance payer
+    SET reserved = payer.reserved - $1
+    WHERE payer.user_id = $4
+      AND payer.symbol_id = $3
+      AND payer.reserved >= $1
+    RETURNING payer.user_id
+)
+UPDATE wallet.balance payee
+SET main = payee.main + $1
+WHERE payee.user_id = $2
+  AND payee.symbol_id = $3
+  AND EXISTS (SELECT 1 FROM debited)
+`
+
+type TransferFundsParams struct {
+	Amount     int64
+	ToUserID   uuid.UUID
+	SymbolID   int32
+	FromUserID uuid.UUID
+}
+
+func (q *Queries) TransferFunds(ctx context.Context, arg TransferFundsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, transferFunds,
+		arg.Amount,
+		arg.ToUserID,
+		arg.SymbolID,
+		arg.FromUserID,
+	)
 	if err != nil {
 		return 0, err
 	}
