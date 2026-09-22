@@ -69,15 +69,18 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		if err = u.orderRepo.CreateOrder(ctx, order); err != nil {
 			return errors.Wrap(err, "repo create order")
 		}
-		if err = u.bookWriter.InsertOrder(ctx, order); err != nil {
-			return errors.Wrap(err, "bookWriter insert order")
-		}
 		return nil
 	}
 
 	if err = u.txManager.WithTX(ctx, fn); err != nil {
 		return Output{}, errors.Wrap(err, "tx manager with tx")
 	}
+
+	if err = u.bookWriter.InsertOrder(ctx, order); err != nil {
+		// TODO: cancel the order
+		return Output{}, errors.Wrap(err, "bookWriter insert order")
+	}
+
 	return Output{}, nil
 }
 

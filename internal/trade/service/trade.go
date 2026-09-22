@@ -58,6 +58,10 @@ func (s *TradeService) Run(ctx context.Context) {
 					// TODO: graceful shutdown
 					return
 				}
+				// TODO: think of the guarantee to actually execute trade or pesist it
+				// halt on settlement failure — so the book stops diverging from the DB
+				// log the failed trade and its error — so you can diagnose
+				// reload open orders on restart — so the trade regenerates
 				s.logger.Errorf("execute trade: %v", err)
 			}
 		}
