@@ -12,6 +12,9 @@ type TradeWriter struct {
 }
 
 func (w *TradeWriter) InsertTrades(ctx context.Context, trades []entity.Trade) error {
+	if len(trades) == 0 {
+		return nil
+	}
 	select {
 	case w.queue <- trades:
 		return nil
