@@ -44,7 +44,7 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 
 		trades, err := m.book.AddOrder(&order)
 		if err != nil {
-			loggerWithOrderID.Errorf("bookWriter Retrieve order: %v", err)
+			loggerWithOrderID.Errorf("book add order: %v", err)
 			continue
 		}
 		entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
