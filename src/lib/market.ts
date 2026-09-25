@@ -18,12 +18,23 @@ type PairsResponse = {
   pairs: MarketPair[];
 };
 
-type BalanceResponse = {
-  amount: number;
+// "main" is the available amount; both values are decimal strings shown as-is.
+export type SymbolBalance = {
+  main: string;
+  reserved: string;
+};
+
+export type PairBalance = {
+  pair_id: number;
+  base: SymbolBalance;
+  quote: SymbolBalance;
 };
 
 const pairsPath = '/api/market/pairs';
-const balancePath = (symbolId: number) => `/api/balances/${symbolId}`;
+const balancePath = (pairId: number) => `/api/balance/${pairId}`;
+
+const defaultBalancePollIntervalMs = 5000;
+const minBalancePollIntervalMs = 1000;
 
 let pairsRequest: Promise<MarketPair[]> | null = null;
 
@@ -35,6 +46,17 @@ function getBackendHost() {
   }
 
   return backendHost;
+}
+
+// Falls back to the default when unset or invalid, and never polls faster than the minimum.
+export function getBalancePollIntervalMs() {
+  const configured = Number(import.meta.env.VITE_BALANCE_POLL_INTERVAL_MS);
+
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return defaultBalancePollIntervalMs;
+  }
+
+  return Math.max(configured, minBalancePollIntervalMs);
 }
 
 export function formatPairLabel(pair: MarketPair) {
@@ -60,8 +82,8 @@ export function fetchPairs(): Promise<MarketPair[]> {
   return pairsRequest;
 }
 
-export async function fetchBalance(symbolId: number, signal?: AbortSignal): Promise<number> {
-  const response = await fetch(`${getBackendHost()}${balancePath(symbolId)}`, {
+export async function fetchPairBalance(pairId: number, signal?: AbortSignal): Promise<PairBalance> {
+  const response = await fetch(`${getBackendHost()}${balancePath(pairId)}`, {
     credentials: 'include',
     signal,
   });
@@ -70,6 +92,5 @@ export async function fetchBalance(symbolId: number, signal?: AbortSignal): Prom
     throw new Error(`Balance request failed with status ${response.status}`);
   }
 
-  const data = (await response.json()) as BalanceResponse;
-  return data.amount;
+  return (await response.json()) as PairBalance;
 }

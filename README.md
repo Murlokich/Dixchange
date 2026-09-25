@@ -10,8 +10,9 @@ The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation
 
 ## Backend host
 
-- Set the backend host in [envs/.env](envs/.env).
+- Copy [envs/.env.example](envs/.env.example) to `envs/.env` and fill in the values.
 - The app reads `VITE_BACKEND_HOST` from that file and uses it for the sign-up POST request.
+- `VITE_BALANCE_POLL_INTERVAL_MS` sets how often the dashboard refreshes balances (default 5000, minimum 1000).
 
 ## Current screen
 

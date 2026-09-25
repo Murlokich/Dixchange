@@ -425,6 +425,12 @@ h1 {
   font-size: 0.98rem;
 }
 
+.balance-reserved {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .deposit-button {
   display: flex;
   align-items: center;

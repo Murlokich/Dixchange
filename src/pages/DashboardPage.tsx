@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchBalance, fetchPairs, formatPairLabel, type MarketPair } from '../lib/market';
+import {
+  fetchPairBalance,
+  fetchPairs,
+  getBalancePollIntervalMs,
+  formatPairLabel,
+  type MarketPair,
+  type PairBalance,
+} from '../lib/market';
 import { getStoredEmail } from '../lib/session';
-
-type Balance = {
-  symbolId: number;
-  currency: string;
-  amount: number | null;
-};
 
 type OpenOrder = {
   id: string;
@@ -118,10 +119,15 @@ export default function DashboardPage() {
   const [pairs, setPairs] = useState<MarketPair[]>([]);
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
   const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
-  const [balances, setBalances] = useState<Balance[]>([]);
+  const [pairBalance, setPairBalance] = useState<PairBalance | null>(null);
   const pairSelectorRef = useRef<HTMLDivElement>(null);
 
   const selectedPair = pairs.find((pair) => pair.id === selectedPairId) ?? null;
+  const [baseSymbol, quoteSymbol] = selectedPair?.symbols ?? [];
+  const balances = [
+    { symbol: baseSymbol, balance: pairBalance?.base },
+    { symbol: quoteSymbol, balance: pairBalance?.quote },
+  ];
 
   useEffect(() => {
     let isActive = true;
@@ -147,31 +153,55 @@ export default function DashboardPage() {
     }
 
     const controller = new AbortController();
-    setBalances(
-      selectedPair.symbols.map((symbol) => ({
-        symbolId: symbol.id,
-        currency: symbol.code,
-        amount: null,
-      })),
-    );
+    const pollIntervalMs = getBalancePollIntervalMs();
+    let timer: number | undefined;
+    let isFetching = false;
+    setPairBalance(null);
 
-    selectedPair.symbols.forEach((symbol) => {
-      fetchBalance(symbol.id, controller.signal)
-        .then((amount) =>
-          setBalances((current) =>
-            current.map((balance) =>
-              balance.symbolId === symbol.id ? { ...balance, amount } : balance,
-            ),
-          ),
-        )
-        .catch((error: unknown) => {
-          if (!controller.signal.aborted) {
-            console.error(error);
-          }
-        });
-    });
+    // Each poll is scheduled only after the previous one settles, so slow responses never pile up.
+    const poll = async () => {
+      if (isFetching) {
+        return;
+      }
+      isFetching = true;
+      window.clearTimeout(timer);
 
-    return () => controller.abort();
+      try {
+        const balance = await fetchPairBalance(selectedPair.id, controller.signal);
+        // The response names its pair, so a late answer for a previously selected pair is dropped.
+        if (balance.pair_id === selectedPair.id) {
+          setPairBalance(balance);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error(error);
+        }
+      } finally {
+        isFetching = false;
+      }
+
+      if (!controller.signal.aborted && !document.hidden) {
+        timer = window.setTimeout(poll, pollIntervalMs);
+      }
+    };
+
+    // Polling pauses while the tab is hidden and refreshes immediately when it is shown again.
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        window.clearTimeout(timer);
+      } else {
+        void poll();
+      }
+    };
+
+    void poll();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [selectedPair]);
 
   useEffect(() => {
@@ -188,7 +218,6 @@ export default function DashboardPage() {
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [isPairMenuOpen]);
-
 
   return (
     <main className="dashboard-page">
@@ -240,14 +269,15 @@ export default function DashboardPage() {
 
         <div className="topbar-right">
           <div className="balance-panel">
-            {balances.map((balance) => (
-              <div className="balance-item" key={balance.symbolId}>
-                <span className="balance-label">{balance.currency}</span>
-                <span className="balance-value">
-                  {balance.amount === null ? '—' : formatAmount(balance.amount)}
-                </span>
-              </div>
-            ))}
+            {balances.map(({ symbol, balance }) =>
+              symbol ? (
+                <div className="balance-item" key={symbol.id}>
+                  <span className="balance-label">{symbol.code}</span>
+                  <span className="balance-value">{balance?.main ?? '—'}</span>
+                  <span className="balance-reserved">{balance?.reserved ?? '—'} reserved</span>
+                </div>
+              ) : null,
+            )}
             <button type="button" className="deposit-button">
               <PlusIcon />
               Deposit
