@@ -23,11 +23,13 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	bookWriter := createorder.NewMockBookWriter(t)
 
 	pair := entity.Pair{
-		ID:    validMarketPairID,
-		Base:  entity.Symbol{ID: 1, Code: "KCN", Precision: 8},
-		Quote: entity.Symbol{ID: 2, Code: "USD", Precision: 2},
+		ID:             validMarketPairID,
+		Base:           entity.Symbol{ID: 1, Code: "KCN", Precision: 0},
+		Quote:          entity.Symbol{ID: 2, Code: "USD", Precision: 2},
+		PricePrecision: 2,
 	}
-	// buy debits the quote asset
+	// buy debits the quote asset; base precision + price precision == quote precision,
+	// so the notional is plain price times quantity
 	wantTotalPrice := validPricePerUnit * validQuantityOrdered
 
 	marketRepo.EXPECT().GetPair(validMarketPairID).Return(pair, true).Once()

@@ -41,35 +41,69 @@ func TestOrder_GetDebitAsset(t *testing.T) {
 	}
 }
 
-func TestOrder_GetDebitNumber(t *testing.T) {
+func TestOrder_GetDebitAmount(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name   string
-		action string
-		want   int64
+		name        string
+		order       entity.Order
+		want        int64
+		errContains string
 	}{
 		{
-			name:   "buy debits price times quantity (quote asset)",
-			action: entity.BuyAction,
-			want:   2000,
+			name: "buy debits notional in quote minor units: 0.00123 BTC at 65000.50 USDT",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Action:          entity.BuyAction,
+				QuantityOrdered: 123000,
+				PricePerUnit:    6500050,
+			},
+			want: 7995061500,
 		},
 		{
-			name:   "sell debits quantity (base asset)",
-			action: entity.SellAction,
-			want:   20,
+			name: "buy debits notional in quote minor units: 1 USD at 1 KCN",
+			order: entity.Order{
+				MarketPair:      usdKcn,
+				Action:          entity.BuyAction,
+				QuantityOrdered: 100,
+				PricePerUnit:    1,
+			},
+			want: 1,
+		},
+		{
+			name: "sell debits quantity in base minor units",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Action:          entity.SellAction,
+				QuantityOrdered: 123000,
+				PricePerUnit:    6500050,
+			},
+			want: 123000,
+		},
+		{
+			name: "buy propagates pair notional error",
+			order: entity.Order{
+				MarketPair:      usdKcn,
+				Action:          entity.BuyAction,
+				QuantityOrdered: 1,
+				PricePerUnit:    1,
+			},
+			errContains: "market pair notional",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{
-				Action:          tc.action,
-				PricePerUnit:    100,
-				QuantityOrdered: 20,
+
+			amount, err := tc.order.GetDebitAmount()
+			if tc.errContains != "" {
+				require.ErrorContains(t, err, tc.errContains)
+				require.Zero(t, amount)
+				return
 			}
-			require.Equal(t, tc.want, order.GetDebitAmount())
+			require.NoError(t, err)
+			require.Equal(t, tc.want, amount)
 		})
 	}
 }

@@ -76,6 +76,122 @@ func TestConverter_ConvertAmountToInt(t *testing.T) {
 	}
 }
 
+func TestConverter_ConvertPriceToInt(t *testing.T) {
+	t.Parallel()
+
+	c := service.NewConverter()
+
+	testCases := []struct {
+		name        string
+		pair        entity.Pair
+		price       decimal.Decimal
+		expected    int64
+		errContains string
+	}{
+		{
+			name: "expensive base: shifts by pair price precision",
+			pair: entity.Pair{
+				Base:           entity.Symbol{Code: "BTC", Precision: 8},
+				Quote:          entity.Symbol{Code: "USDT", Precision: 8},
+				PricePrecision: 2,
+			},
+			price:    decimal.RequireFromString("65000.50"),
+			expected: 6500050,
+		},
+		{
+			name: "cheap base: price precision finer than quote precision",
+			pair: entity.Pair{
+				Base:           entity.Symbol{Code: "SHIB", Precision: 8},
+				Quote:          entity.Symbol{Code: "USD", Precision: 2},
+				PricePrecision: 8,
+			},
+			price:    decimal.RequireFromString("0.00001234"),
+			expected: 1234,
+		},
+		{
+			name: "close-valued pair: fine tick",
+			pair: entity.Pair{
+				Base:           entity.Symbol{Code: "EUR", Precision: 2},
+				Quote:          entity.Symbol{Code: "USD", Precision: 2},
+				PricePrecision: 5,
+			},
+			price:    decimal.RequireFromString("1.08345"),
+			expected: 108345,
+		},
+		{
+			name: "price precision zero: whole number passes through unchanged",
+			pair: entity.Pair{
+				Base:  entity.Symbol{Code: "USD", Precision: 2},
+				Quote: entity.Symbol{Code: "KCN", Precision: 0},
+			},
+			price:    decimal.RequireFromString("7"),
+			expected: 7,
+		},
+		{
+			name: "excess decimal places beyond price precision rejected",
+			pair: entity.Pair{
+				Base:           entity.Symbol{Code: "BTC", Precision: 8},
+				Quote:          entity.Symbol{Code: "USDT", Precision: 8},
+				PricePrecision: 2,
+			},
+			price:       decimal.RequireFromString("65000.505"),
+			errContains: "more decimal places",
+		},
+		{
+			name: "shifted price exceeds int64 range",
+			pair: entity.Pair{
+				Base:           entity.Symbol{Code: "SHIB", Precision: 8},
+				Quote:          entity.Symbol{Code: "USDT", Precision: 8},
+				PricePrecision: 18,
+			},
+			price:       decimal.RequireFromString("10"),
+			errContains: "exceeds int64 range",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := c.ConvertPriceToInt(tc.pair, tc.price)
+			if tc.errContains != "" {
+				require.ErrorContains(t, err, tc.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestConverter_DeriveOrderWithQuantitativeFields_PriceUsesPairPrecision(t *testing.T) {
+	t.Parallel()
+
+	c := service.NewConverter()
+	order := baseOrder()
+	order.MarketPair = entity.Pair{
+		Base:           entity.Symbol{Code: "SHIB", Precision: 0},
+		Quote:          entity.Symbol{Code: "USD", Precision: 2},
+		LotSize:        1000000, // 1M SHIB
+		PriceTick:      1,       // 0.00000001 USD
+		PricePrecision: 8,
+	}
+
+	got, err := c.DeriveOrderWithQuantitativeFields(
+		order,
+		decimal.RequireFromString("5000000"),
+		decimal.RequireFromString("0.00001234"),
+	)
+
+	require.NoError(t, err)
+
+	expected := order
+	expected.QuantityOrdered = 5000000 // 5M SHIB shifted by base precision 0
+	expected.PricePerUnit = 1234       // shifted by pair price precision 8, not quote precision 2
+	require.Equal(t, expected, got)
+}
+
 func TestConverter_DeriveOrderWithQuantitativeFields_HappyPath(t *testing.T) {
 	t.Parallel()
 
@@ -92,7 +208,7 @@ func TestConverter_DeriveOrderWithQuantitativeFields_HappyPath(t *testing.T) {
 
 	expected := order
 	expected.QuantityOrdered = 75000000 // 0.75 BTC shifted by base precision 8
-	expected.PricePerUnit = 6543210     // 65432.10 USD shifted by quote precision 2
+	expected.PricePerUnit = 6543210     // 65432.10 USD shifted by pair price precision 2
 	require.Equal(t, expected, got)
 }
 
@@ -113,9 +229,9 @@ func TestConverter_DeriveOrderWithQuantitativeFields_Errors(t *testing.T) {
 			errContains: "more decimal places",
 		},
 		{
-			name:        "price has more decimal places than quote precision",
+			name:        "price has more decimal places than pair price precision",
 			quantity:    decimal.RequireFromString("0.75"),
-			price:       decimal.RequireFromString("65432.109"), // 3 decimals, quote precision 2
+			price:       decimal.RequireFromString("65432.109"), // 3 decimals, price precision 2
 			errContains: "more decimal places",
 		},
 		{
@@ -153,10 +269,11 @@ func TestConverter_DeriveOrderWithQuantitativeFields_Errors(t *testing.T) {
 
 func validPair() entity.Pair {
 	return entity.Pair{
-		Base:      entity.Symbol{Code: "BTC", Precision: 8},
-		Quote:     entity.Symbol{Code: "USD", Precision: 2},
-		LotSize:   1000, // 0.00001 BTC
-		PriceTick: 5,    // 5 cents
+		Base:           entity.Symbol{Code: "BTC", Precision: 8},
+		Quote:          entity.Symbol{Code: "USD", Precision: 2},
+		LotSize:        1000, // 0.00001 BTC
+		PriceTick:      5,    // 0.05 USD
+		PricePrecision: 2,
 	}
 }
 

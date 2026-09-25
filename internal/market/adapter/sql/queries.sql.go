@@ -18,6 +18,7 @@ SELECT
     q.code AS quote_currency_code,
     p.lot_size AS lot_size,
     p.price_tick AS price_tick,
+    p.price_precision AS price_precision,
     b.precision AS base_precision,
     q.precision AS quote_precision
 FROM 
@@ -36,6 +37,7 @@ type GetPairsRow struct {
 	QuoteCurrencyCode string
 	LotSize           int64
 	PriceTick         int64
+	PricePrecision    int16
 	BasePrecision     int16
 	QuotePrecision    int16
 }
@@ -57,6 +59,7 @@ func (q *Queries) GetPairs(ctx context.Context) ([]GetPairsRow, error) {
 			&i.QuoteCurrencyCode,
 			&i.LotSize,
 			&i.PriceTick,
+			&i.PricePrecision,
 			&i.BasePrecision,
 			&i.QuotePrecision,
 		); err != nil {

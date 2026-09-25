@@ -51,9 +51,13 @@ func (o *Order) GetCreditAsset() (Symbol, error) {
 	return Symbol{}, errors.Errorf("invalid action value: %s", o.Action)
 }
 
-func (o *Order) GetDebitAmount() int64 {
+func (o *Order) GetDebitAmount() (int64, error) {
 	if o.Action == BuyAction {
-		return o.PricePerUnit * o.QuantityOrdered
+		amount, err := o.MarketPair.Notional(o.QuantityOrdered, o.PricePerUnit)
+		if err != nil {
+			return 0, errors.Wrap(err, "market pair notional")
+		}
+		return amount, nil
 	}
-	return o.QuantityOrdered
+	return o.QuantityOrdered, nil
 }

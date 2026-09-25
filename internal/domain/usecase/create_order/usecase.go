@@ -62,8 +62,13 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "get debit asset")
 	}
 
+	debitAmount, err := order.GetDebitAmount()
+	if err != nil {
+		return Output{}, errors.Wrap(err, "get debit amount")
+	}
+
 	fn := func(ctx context.Context) error {
-		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, order.GetDebitAmount()); err != nil {
+		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, debitAmount); err != nil {
 			return errors.Wrap(err, "wallet repo reserve funds")
 		}
 		if err = u.orderRepo.CreateOrder(ctx, order); err != nil {

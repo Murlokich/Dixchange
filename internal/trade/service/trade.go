@@ -79,6 +79,11 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 	}
 	trade.ID = id
 
+	notional, notionalErr := trade.Notional()
+	if notionalErr != nil {
+		return pkgerrors.Wrap(notionalErr, "trade notional")
+	}
+
 	fn := func(ctx context.Context) error {
 		if err := s.tradeRepo.CreateTrade(ctx, trade); err != nil {
 			return pkgerrors.Wrap(err, "trade repo create trade")
@@ -91,7 +96,7 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 			trade.Bid.UserID,
 			trade.Ask.UserID,
 			trade.MarketPair.Quote.ID,
-			trade.Price*trade.Quantity,
+			notional,
 		); err != nil {
 			return pkgerrors.Wrap(err, "wallet repo transfer quote funds")
 		}
@@ -127,21 +132,21 @@ func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) err
 }
 
 // releaseExcessReservation returns the funds the buyer reserved on top of what the
-// trade actually cost. A buy order reserves the quote asset at its own price, but the
-// trade executes at the resting order price, which is never higher - the difference
-// would stay locked otherwise. Only the bid side can hold a remainder: sellers reserve
-// the base asset in quantity units, which a fill consumes exactly.
+// trade actually cost, which would stay locked otherwise.
 func (s *TradeService) releaseExcessReservation(ctx context.Context, trade entity.Trade) error {
-	excessPerUnit := trade.Bid.OrderPrice - trade.Price
-	if excessPerUnit <= 0 {
+	excess, err := trade.GetExcessReservedAmount()
+	if err != nil {
+		return pkgerrors.Wrap(err, "trade get excess reserved amount")
+	}
+	if excess <= 0 {
 		return nil
 	}
 
-	if err := s.walletRepo.ReleaseReservedFunds(
+	if err = s.walletRepo.ReleaseReservedFunds(
 		ctx,
 		trade.Bid.UserID,
 		trade.MarketPair.Quote.ID,
-		excessPerUnit*trade.Quantity,
+		excess,
 	); err != nil {
 		return pkgerrors.Wrap(err, "wallet repo release reserved funds")
 	}
