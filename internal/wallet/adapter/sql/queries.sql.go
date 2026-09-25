@@ -44,6 +44,43 @@ func (q *Queries) Deposit(ctx context.Context, arg DepositParams) (int64, error)
 	return result.RowsAffected(), nil
 }
 
+const getPairBalances = `-- name: GetPairBalances :many
+SELECT symbol_id, main, reserved FROM wallet.balance
+WHERE user_id = $1 AND symbol_id IN ($2, $3)
+`
+
+type GetPairBalancesParams struct {
+	UserID     uuid.UUID
+	SymbolID   int32
+	SymbolID_2 int32
+}
+
+type GetPairBalancesRow struct {
+	SymbolID int32
+	Main     int64
+	Reserved int64
+}
+
+func (q *Queries) GetPairBalances(ctx context.Context, arg GetPairBalancesParams) ([]GetPairBalancesRow, error) {
+	rows, err := q.db.Query(ctx, getPairBalances, arg.UserID, arg.SymbolID, arg.SymbolID_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPairBalancesRow
+	for rows.Next() {
+		var i GetPairBalancesRow
+		if err := rows.Scan(&i.SymbolID, &i.Main, &i.Reserved); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const releaseReservedFunds = `-- name: ReleaseReservedFunds :execrows
 UPDATE wallet.balance
 SET reserved = reserved - $1,

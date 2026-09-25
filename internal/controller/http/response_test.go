@@ -60,3 +60,24 @@ func TestNewMarketDataResponse_NoPairsIsEmptyArray(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{"pairs": []}`, string(body))
 }
+
+func TestNewPairBalanceResponse_JSON(t *testing.T) {
+	t.Parallel()
+
+	pair := entity.Pair{
+		ID:    1,
+		Base:  entity.Symbol{ID: 1, Code: "USD", Precision: 2},
+		Quote: entity.Symbol{ID: 2, Code: "KCN", Precision: 0},
+	}
+	base := entity.Balance{SymbolID: 1, Main: 1050, Reserved: 0}
+	quote := entity.Balance{SymbolID: 2, Main: 7, Reserved: 3}
+
+	body, err := json.Marshal(newPairBalanceResponse(pair, base, quote))
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"pair_id": 1,
+		"base": {"main": "10.50", "reserved": "0.00"},
+		"quote": {"main": "7", "reserved": "3"}
+	}`, string(body))
+}

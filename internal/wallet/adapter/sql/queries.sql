@@ -30,3 +30,8 @@ SET main = payee.main + sqlc.arg(amount)
 WHERE payee.user_id = sqlc.arg(to_user_id)
   AND payee.symbol_id = sqlc.arg(symbol_id)
   AND EXISTS (SELECT 1 FROM debited);
+
+
+-- name: GetPairBalances :many
+SELECT symbol_id, main, reserved FROM wallet.balance
+WHERE user_id = $1 AND symbol_id IN ($2, $3);

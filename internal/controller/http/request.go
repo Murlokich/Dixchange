@@ -25,3 +25,7 @@ type CreateOrderRequest struct {
 	QuantityOrdered decimal.Decimal `json:"quantity_ordered"`
 	PricePerUnit    decimal.Decimal `json:"price_per_unit"`
 }
+
+type GetPairBalanceRequest struct {
+	PairID int `uri:"pair_id" binding:"required,min=0"`
+}

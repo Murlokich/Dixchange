@@ -34,6 +34,39 @@ func (r *Repository) CreateBalanceRecord(ctx context.Context, balanceRecord enti
 	return nil
 }
 
+// GetPairBalances returns the user balances of the pair base and quote symbols in a single query,
+// so both are read from the same snapshot. A symbol without a record is omitted.
+func (r *Repository) GetPairBalances(
+	ctx context.Context,
+	userID uuid.UUID,
+	baseSymbolID int,
+	quoteSymbolID int,
+) ([]entity.Balance, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	balances, err := q.GetPairBalances(ctx, GetPairBalancesParams{
+		UserID: userID,
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID: int32(baseSymbolID),
+		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
+		SymbolID_2: int32(quoteSymbolID),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "query get pair balances")
+	}
+
+	result := make([]entity.Balance, 0, len(balances))
+	for _, b := range balances {
+		result = append(result, entity.Balance{
+			SymbolID: int(b.SymbolID),
+			Main:     b.Main,
+			Reserved: b.Reserved,
+		})
+	}
+	return result, nil
+}
+
 func (r *Repository) Deposit(ctx context.Context, userID uuid.UUID, symbolID int, amount int64) error {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)

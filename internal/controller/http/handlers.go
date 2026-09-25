@@ -6,6 +6,7 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,8 @@ const (
 	createOrderFailureResponse             = "Order creation failed due to internal error"
 	createOrderInsufficientBalanceResponse = "Order creation faild due to insufficient balance"
 	getMarketDataFailureResponse           = "Market data retrieval failed due to internal error"
+	getPairBalanceFailureResponse          = "Pair balance retrieval failed due to internal error"
+	getPairBalanceNotFoundResponse         = "Balance not found"
 
 	errorField = "error"
 
@@ -171,4 +174,42 @@ func getMarketDataHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.JSON(http.StatusOK, newMarketDataResponse(output.Pairs))
+}
+
+func getPairBalanceHandler(c *gin.Context, deps *Dependencies) {
+	var req GetPairBalanceRequest
+
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	output, err := deps.GetPairBalance.Execute(c, getpairbalance.Input{
+		UserID: userID,
+		PairID: req.PairID,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		if errors.Is(err, entity.ErrBalanceNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{errorField: getPairBalanceNotFoundResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getPairBalanceFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newPairBalanceResponse(output.Pair, output.Base, output.Quote))
 }
