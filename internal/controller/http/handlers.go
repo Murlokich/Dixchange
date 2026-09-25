@@ -21,6 +21,7 @@ const (
 	loginFailureResponse                   = "Login failed due to internal error"
 	createOrderFailureResponse             = "Order creation failed due to internal error"
 	createOrderInsufficientBalanceResponse = "Order creation faild due to insufficient balance"
+	getMarketDataFailureResponse           = "Market data retrieval failed due to internal error"
 
 	errorField = "error"
 
@@ -160,4 +161,14 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.Status(http.StatusCreated)
+}
+
+func getMarketDataHandler(c *gin.Context, deps *Dependencies) {
+	output, err := deps.GetMarketData.Execute(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getMarketDataFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newMarketDataResponse(output.Pairs))
 }
