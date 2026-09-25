@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { fetchBalance, fetchPairs, formatPairLabel, type MarketPair } from '../lib/market';
 import { getStoredEmail } from '../lib/session';
 
 type Balance = {
+  symbolId: number;
   currency: string;
-  amount: number;
+  amount: number | null;
 };
 
 type OpenOrder = {
@@ -31,11 +33,6 @@ type Stat = {
   value: string;
   tone?: 'positive' | 'negative';
 };
-
-const balances: Balance[] = [
-  { currency: 'USD', amount: 12480.32 },
-  { currency: 'KCN', amount: 3250.5 },
-];
 
 const openOrders: OpenOrder[] = [
   { id: 'ORD-1042', pair: 'KCN/USD', side: 'buy', type: 'Limit', amount: 150, price: 4.82, status: 'Open' },
@@ -78,6 +75,20 @@ function formatAmount(amount: number) {
   return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="M6 9L12 15L18 9"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function BrandMark() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
@@ -104,6 +115,80 @@ export default function DashboardPage() {
   const email = getStoredEmail() ?? 'Unknown user';
   const initial = email.charAt(0).toUpperCase() || '?';
   const [isOrderMenuOpen, setIsOrderMenuOpen] = useState(false);
+  const [pairs, setPairs] = useState<MarketPair[]>([]);
+  const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
+  const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
+  const [balances, setBalances] = useState<Balance[]>([]);
+  const pairSelectorRef = useRef<HTMLDivElement>(null);
+
+  const selectedPair = pairs.find((pair) => pair.id === selectedPairId) ?? null;
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetchPairs()
+      .then((loadedPairs) => {
+        if (!isActive) {
+          return;
+        }
+        setPairs(loadedPairs);
+        setSelectedPairId((current) => current ?? loadedPairs[0]?.id ?? null);
+      })
+      .catch((error: unknown) => console.error(error));
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPair) {
+      return;
+    }
+
+    const controller = new AbortController();
+    setBalances(
+      selectedPair.symbols.map((symbol) => ({
+        symbolId: symbol.id,
+        currency: symbol.code,
+        amount: null,
+      })),
+    );
+
+    selectedPair.symbols.forEach((symbol) => {
+      fetchBalance(symbol.id, controller.signal)
+        .then((amount) =>
+          setBalances((current) =>
+            current.map((balance) =>
+              balance.symbolId === symbol.id ? { ...balance, amount } : balance,
+            ),
+          ),
+        )
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) {
+            console.error(error);
+          }
+        });
+    });
+
+    return () => controller.abort();
+  }, [selectedPair]);
+
+  useEffect(() => {
+    if (!isPairMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!pairSelectorRef.current?.contains(event.target as Node)) {
+        setIsPairMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isPairMenuOpen]);
+
 
   return (
     <main className="dashboard-page">
@@ -115,12 +200,52 @@ export default function DashboardPage() {
           <span>Trading Platform</span>
         </div>
 
+        <div className="pair-selector" ref={pairSelectorRef}>
+          <button
+            type="button"
+            className="pair-trigger"
+            onClick={() => setIsPairMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={isPairMenuOpen}
+            disabled={pairs.length === 0}
+            data-pair-id={selectedPair?.id}
+          >
+            <span className="pair-label">
+              {selectedPair ? formatPairLabel(selectedPair) : 'Loading…'}
+            </span>
+            {selectedPair ? <span className="pair-id">#{selectedPair.id}</span> : null}
+            <ChevronIcon />
+          </button>
+
+          {isPairMenuOpen ? (
+            <div className="pair-menu" role="menu">
+              {pairs.map((pair) => (
+                <button
+                  type="button"
+                  key={pair.id}
+                  role="menuitemradio"
+                  aria-checked={pair.id === selectedPairId}
+                  onClick={() => {
+                    setSelectedPairId(pair.id);
+                    setIsPairMenuOpen(false);
+                  }}
+                >
+                  <span>{formatPairLabel(pair)}</span>
+                  <span className="pair-id">#{pair.id}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <div className="topbar-right">
           <div className="balance-panel">
             {balances.map((balance) => (
-              <div className="balance-item" key={balance.currency}>
+              <div className="balance-item" key={balance.symbolId}>
                 <span className="balance-label">{balance.currency}</span>
-                <span className="balance-value">{formatAmount(balance.amount)}</span>
+                <span className="balance-value">
+                  {balance.amount === null ? '—' : formatAmount(balance.amount)}
+                </span>
               </div>
             ))}
             <button type="button" className="deposit-button">

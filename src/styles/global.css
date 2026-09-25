@@ -321,6 +321,74 @@ h1 {
   color: #04111a;
 }
 
+.pair-selector {
+  position: relative;
+  margin-right: auto;
+}
+
+.pair-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.pair-trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pair-trigger:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+
+.pair-id {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pair-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(8, 15, 28, 0.98);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+  z-index: 3;
+}
+
+.pair-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.pair-menu button:hover,
+.pair-menu button[aria-checked='true'] {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
