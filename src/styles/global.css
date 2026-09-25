@@ -450,6 +450,95 @@ h1 {
   transform: translateY(-1px);
 }
 
+.deposit-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+  transform: none;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(2, 6, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.dialog {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 400px);
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(13, 23, 41, 0.98), rgba(8, 15, 28, 0.98));
+  box-shadow: var(--shadow);
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.dialog .form-note {
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.dialog-actions .primary-action {
+  margin-top: 0;
+}
+
+.dialog-actions .primary-action:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.field-group select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(137, 179, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  outline: none;
+}
+
+.field-group select:focus {
+  border-color: rgba(143, 240, 255, 0.55);
+  box-shadow: 0 0 0 4px rgba(103, 215, 255, 0.12);
+}
+
+.field-group select option {
+  background: #0d1729;
+}
+
+.field-group input[aria-invalid='true'] {
+  border-color: rgba(255, 107, 129, 0.8);
+}
+
+.field-group input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 4px rgba(255, 107, 129, 0.16);
+}
+
+.field-message {
+  min-height: 1.3em;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.field-message.error {
+  color: #ffb3c1;
+}
+
 .account-chip {
   display: flex;
   align-items: center;

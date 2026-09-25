@@ -32,6 +32,7 @@ export type PairBalance = {
 
 const pairsPath = '/api/market/pairs';
 const balancePath = (pairId: number) => `/api/balance/${pairId}`;
+const depositPath = '/api/balance/deposit';
 
 const defaultBalancePollIntervalMs = 5000;
 const minBalancePollIntervalMs = 1000;
@@ -93,4 +94,19 @@ export async function fetchPairBalance(pairId: number, signal?: AbortSignal): Pr
   }
 
   return (await response.json()) as PairBalance;
+}
+
+export async function depositBalance(symbolId: number, amount: string): Promise<void> {
+  const response = await fetch(`${getBackendHost()}${depositPath}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ amount, symbol_id: symbolId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Deposit request failed with status ${response.status}`);
+  }
 }

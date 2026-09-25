@@ -7,6 +7,7 @@ import {
   type MarketPair,
   type PairBalance,
 } from '../lib/market';
+import DepositDialog from '../components/DepositDialog';
 import { getStoredEmail } from '../lib/session';
 
 type OpenOrder = {
@@ -120,7 +121,9 @@ export default function DashboardPage() {
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
   const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
   const [pairBalance, setPairBalance] = useState<PairBalance | null>(null);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
   const pairSelectorRef = useRef<HTMLDivElement>(null);
+  const refreshBalanceRef = useRef<(() => void) | null>(null);
 
   const selectedPair = pairs.find((pair) => pair.id === selectedPairId) ?? null;
   const [baseSymbol, quoteSymbol] = selectedPair?.symbols ?? [];
@@ -156,11 +159,14 @@ export default function DashboardPage() {
     const pollIntervalMs = getBalancePollIntervalMs();
     let timer: number | undefined;
     let isFetching = false;
+    let isRefreshQueued = false;
     setPairBalance(null);
 
     // Each poll is scheduled only after the previous one settles, so slow responses never pile up.
     const poll = async () => {
       if (isFetching) {
+        // A refresh requested mid-request (e.g. after a deposit) runs right after it instead of being lost.
+        isRefreshQueued = true;
         return;
       }
       isFetching = true;
@@ -180,7 +186,13 @@ export default function DashboardPage() {
         isFetching = false;
       }
 
-      if (!controller.signal.aborted && !document.hidden) {
+      if (controller.signal.aborted || document.hidden) {
+        return;
+      }
+      if (isRefreshQueued) {
+        isRefreshQueued = false;
+        void poll();
+      } else {
         timer = window.setTimeout(poll, pollIntervalMs);
       }
     };
@@ -195,10 +207,12 @@ export default function DashboardPage() {
     };
 
     void poll();
+    refreshBalanceRef.current = () => void poll();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       controller.abort();
+      refreshBalanceRef.current = null;
       window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -278,7 +292,12 @@ export default function DashboardPage() {
                 </div>
               ) : null,
             )}
-            <button type="button" className="deposit-button">
+            <button
+              type="button"
+              className="deposit-button"
+              onClick={() => setIsDepositOpen(true)}
+              disabled={!selectedPair}
+            >
               <PlusIcon />
               Deposit
             </button>
@@ -390,6 +409,14 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      {isDepositOpen && selectedPair ? (
+        <DepositDialog
+          symbols={selectedPair.symbols}
+          onClose={() => setIsDepositOpen(false)}
+          onDeposited={() => refreshBalanceRef.current?.()}
+        />
+      ) : null}
     </main>
   );
 }

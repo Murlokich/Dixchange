@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
@@ -124,5 +124,93 @@ describe('DashboardPage pair selector', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('DashboardPage deposit', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('validates the amount per symbol precision and posts the raw string', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === `${host}/api/balance/deposit`) {
+        return jsonResponse({});
+      }
+      return jsonResponse(balanceResponses[1]);
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('8.00');
+
+    fireEvent.click(screen.getByRole('button', { name: /deposit/i }));
+    const dialog = screen.getByRole('dialog', { name: /deposit/i });
+    const amount = within(dialog).getByLabelText(/amount/i);
+    const submit = within(dialog).getByRole('button', { name: /^deposit$/i });
+
+    expect(within(dialog).getByText('Up to 2 decimal places')).toBeTruthy();
+    expect(submit).toHaveProperty('disabled', true);
+
+    fireEvent.change(amount, { target: { value: '1.234' } });
+    expect(amount.getAttribute('aria-invalid')).toBe('true');
+    expect(within(dialog).getByText('USD allows at most 2 decimal places')).toBeTruthy();
+    expect(submit).toHaveProperty('disabled', true);
+
+    fireEvent.change(within(dialog).getByLabelText(/currency/i), { target: { value: '2' } });
+    fireEvent.change(amount, { target: { value: '1.5' } });
+    expect(within(dialog).getByText('KCN accepts whole numbers only')).toBeTruthy();
+
+    fireEvent.change(amount, { target: { value: '25' } });
+    expect(amount.getAttribute('aria-invalid')).toBeNull();
+    expect(submit).toHaveProperty('disabled', false);
+
+    const balanceCallsBefore = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).endsWith('/api/balance/1'),
+    ).length;
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(fetchSpy).toHaveBeenCalledWith(`${host}/api/balance/deposit`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: '25', symbol_id: 2 }),
+    });
+    await waitFor(() =>
+      expect(
+        fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/api/balance/1')).length,
+      ).toBeGreaterThan(balanceCallsBefore),
+    );
+  });
+
+  it('keeps the dialog open and shows the error when the deposit fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === `${host}/api/balance/deposit`) {
+        return { ok: false, status: 400 } as Response;
+      }
+      return jsonResponse(balanceResponses[1]);
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('8.00');
+
+    fireEvent.click(screen.getByRole('button', { name: /deposit/i }));
+    const dialog = screen.getByRole('dialog', { name: /deposit/i });
+    fireEvent.change(within(dialog).getByLabelText(/amount/i), { target: { value: '10.50' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: /^deposit$/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Deposit request failed with status 400',
+    );
+    expect(screen.getByRole('dialog')).toBeTruthy();
   });
 });
