@@ -1,3 +1,5 @@
+import { getBackendHost } from './api';
+
 export type MarketSymbol = {
   id: number;
   code: string;
@@ -34,31 +36,7 @@ const pairsPath = '/api/market/pairs';
 const balancePath = (pairId: number) => `/api/balance/${pairId}`;
 const depositPath = '/api/balance/deposit';
 
-const defaultBalancePollIntervalMs = 5000;
-const minBalancePollIntervalMs = 1000;
-
 let pairsRequest: Promise<MarketPair[]> | null = null;
-
-function getBackendHost() {
-  const backendHost = import.meta.env.VITE_BACKEND_HOST?.trim();
-
-  if (!backendHost) {
-    throw new Error('Set VITE_BACKEND_HOST in envs/.env before continuing.');
-  }
-
-  return backendHost;
-}
-
-// Falls back to the default when unset or invalid, and never polls faster than the minimum.
-export function getBalancePollIntervalMs() {
-  const configured = Number(import.meta.env.VITE_BALANCE_POLL_INTERVAL_MS);
-
-  if (!Number.isFinite(configured) || configured <= 0) {
-    return defaultBalancePollIntervalMs;
-  }
-
-  return Math.max(configured, minBalancePollIntervalMs);
-}
 
 export function formatPairLabel(pair: MarketPair) {
   return pair.symbols.map((symbol) => symbol.code).join('/');

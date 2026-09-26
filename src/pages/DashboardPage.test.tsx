@@ -45,11 +45,57 @@ const balanceResponses: Record<number, unknown> = {
   },
 };
 
-const mockBackend = (balances: Record<number, unknown>) =>
+const ordersUrl = `${host}/api/orders?status=open`;
+
+const ordersResponse = {
+  orders: [
+    {
+      id: '01a0cdca-9934-71a2-9983-73541b0e6921',
+      pair_id: 1,
+      side: 'buy',
+      quantity_ordered: '3.00',
+      quantity_filled: '0.00',
+      remaining_quantity: '3.00',
+      price_per_unit: '7',
+      status: 'open',
+      created_at: '2026-09-23T10:23:21Z',
+      last_updated_at: null,
+    },
+    {
+      id: '01a0cdbe-6d4c-7106-bda9-5f35959e6b96',
+      pair_id: 2,
+      side: 'sell',
+      quantity_ordered: '6.00',
+      quantity_filled: '1.50',
+      remaining_quantity: '4.50',
+      price_per_unit: '4.5',
+      status: 'open',
+      created_at: '2026-09-23T10:10:04Z',
+      last_updated_at: '2026-09-24T08:00:00Z',
+    },
+    {
+      id: '01a0cdbe-0000-7106-bda9-5f35959e6b96',
+      pair_id: 9,
+      side: 'buy',
+      quantity_ordered: '9.00',
+      quantity_filled: '0.00',
+      remaining_quantity: '9.00',
+      price_per_unit: '3',
+      status: 'open',
+      created_at: '2026-09-22T09:00:00Z',
+      last_updated_at: null,
+    },
+  ],
+};
+
+const mockBackend = (balances: Record<number, unknown>, orders: unknown = ordersResponse) =>
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = String(input);
     if (url === `${host}/api/market/pairs`) {
       return jsonResponse(pairsResponse);
+    }
+    if (url === ordersUrl) {
+      return jsonResponse(orders);
     }
     return jsonResponse(balances[Number(url.split('/').pop())]);
   });
@@ -104,6 +150,9 @@ describe('DashboardPage pair selector', () => {
       if (String(input) === `${host}/api/market/pairs`) {
         return jsonResponse(pairsResponse);
       }
+      if (String(input) === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
       call += 1;
       return jsonResponse({
         pair_id: 1,
@@ -137,6 +186,9 @@ describe('DashboardPage deposit', () => {
       const url = String(input);
       if (url === `${host}/api/market/pairs`) {
         return jsonResponse(pairsResponse);
+      }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
       }
       if (url === `${host}/api/balance/deposit`) {
         return jsonResponse({});
@@ -193,6 +245,9 @@ describe('DashboardPage deposit', () => {
       if (url === `${host}/api/market/pairs`) {
         return jsonResponse(pairsResponse);
       }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
       if (url === `${host}/api/balance/deposit`) {
         return { ok: false, status: 400 } as Response;
       }
@@ -212,5 +267,50 @@ describe('DashboardPage deposit', () => {
       'Deposit request failed with status 400',
     );
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('DashboardPage open orders', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders open orders across all pairs from the backend', async () => {
+    const fetchSpy = mockBackend(balanceResponses);
+
+    render(<DashboardPage />);
+
+    const section = screen.getByRole('region', { name: /open orders/i });
+    const table = await within(section).findByRole('table');
+    await within(table).findByText('USD/KCN');
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(3);
+
+    expect(rows[0].textContent).toContain('buy');
+    expect(rows[0].textContent).toContain('7');
+    expect(rows[0].textContent).toContain('3.00 / 3.00');
+    expect(within(rows[0]).getByTitle('Not updated since creation')).toBeTruthy();
+
+    expect(within(rows[1]).getByText('EUR/KCN')).toBeTruthy();
+    expect(within(rows[1]).getByText('sell').className).toBe('side-sell');
+    expect(rows[1].textContent).toContain('4.50 / 6.00');
+    expect(within(rows[1]).getByTitle(/^Last updated /)).toBeTruthy();
+
+    expect(within(rows[2]).getByText('Pair #9')).toBeTruthy();
+
+    expect(
+      screen.getByText('Open orders', { selector: '.stat-label' }).nextSibling?.textContent,
+    ).toBe('3');
+    expect(fetchSpy).toHaveBeenCalledWith(ordersUrl, expect.anything());
+  });
+
+  it('shows the empty state when there are no open orders', async () => {
+    mockBackend(balanceResponses, { orders: [] });
+
+    render(<DashboardPage />);
+
+    const section = screen.getByRole('region', { name: /open orders/i });
+    expect(await within(section).findByText('No open orders yet.')).toBeTruthy();
+    expect(within(section).queryByRole('table')).toBeNull();
   });
 });

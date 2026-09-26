@@ -1,24 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchPairBalance,
   fetchPairs,
-  getBalancePollIntervalMs,
   formatPairLabel,
   type MarketPair,
   type PairBalance,
 } from '../lib/market';
+import { fetchOrders, formatOrderTime, type Order } from '../lib/orders';
 import DepositDialog from '../components/DepositDialog';
 import { getStoredEmail } from '../lib/session';
-
-type OpenOrder = {
-  id: string;
-  pair: string;
-  side: 'buy' | 'sell';
-  type: string;
-  amount: number;
-  price: number;
-  status: string;
-};
+import { readPollIntervalMs, usePolling, type PollFetcher } from '../lib/usePolling';
 
 type Trade = {
   id: string;
@@ -36,20 +27,6 @@ type Stat = {
   tone?: 'positive' | 'negative';
 };
 
-const openOrders: OpenOrder[] = [
-  { id: 'ORD-1042', pair: 'KCN/USD', side: 'buy', type: 'Limit', amount: 150, price: 4.82, status: 'Open' },
-  { id: 'ORD-1041', pair: 'KCN/USD', side: 'sell', type: 'Limit', amount: 80, price: 5.1, status: 'Open' },
-  {
-    id: 'ORD-1038',
-    pair: 'KCN/USD',
-    side: 'buy',
-    type: 'Market',
-    amount: 25,
-    price: 4.95,
-    status: 'Partially filled',
-  },
-];
-
 const tradeHistory: Trade[] = [
   { id: 'TRD-9231', pair: 'KCN/USD', side: 'buy', amount: 200, price: 4.7, total: 940, executedAt: '2026-08-03 14:22' },
   { id: 'TRD-9214', pair: 'KCN/USD', side: 'sell', amount: 60, price: 5.05, total: 303, executedAt: '2026-08-02 09:47' },
@@ -64,12 +41,10 @@ const tradeHistory: Trade[] = [
   },
 ];
 
-const stats: Stat[] = [
-  { label: 'Portfolio value', value: '$18,640.90' },
-  { label: '24h P/L', value: '+2.4%', tone: 'positive' },
-  { label: 'Open orders', value: String(openOrders.length) },
-  { label: 'Total trades', value: '128' },
-];
+const balancePollIntervalMs = readPollIntervalMs(import.meta.env.VITE_BALANCE_POLL_INTERVAL_MS);
+const ordersPollIntervalMs = readPollIntervalMs(import.meta.env.VITE_ORDERS_POLL_INTERVAL_MS);
+
+const fetchOpenOrders: PollFetcher<Order[]> = (signal) => fetchOrders('open', signal);
 
 const orderMenuOptions = ['Market order', 'Limit order'];
 
@@ -120,12 +95,35 @@ export default function DashboardPage() {
   const [pairs, setPairs] = useState<MarketPair[]>([]);
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
   const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
-  const [pairBalance, setPairBalance] = useState<PairBalance | null>(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const pairSelectorRef = useRef<HTMLDivElement>(null);
-  const refreshBalanceRef = useRef<(() => void) | null>(null);
 
   const selectedPair = pairs.find((pair) => pair.id === selectedPairId) ?? null;
+
+  const fetchSelectedPairBalance = useMemo<PollFetcher<PairBalance> | null>(() => {
+    if (selectedPairId === null) {
+      return null;
+    }
+    return async (signal) => {
+      const balance = await fetchPairBalance(selectedPairId, signal);
+      // The response names its pair, so a late answer for a previously selected pair is dropped.
+      return balance.pair_id === selectedPairId ? balance : null;
+    };
+  }, [selectedPairId]);
+
+  const { data: pairBalance, refresh: refreshBalance } = usePolling(
+    fetchSelectedPairBalance,
+    balancePollIntervalMs,
+  );
+  const { data: openOrders } = usePolling(fetchOpenOrders, ordersPollIntervalMs);
+
+  const pairLabels = new Map(pairs.map((pair) => [pair.id, formatPairLabel(pair)]));
+  const stats: Stat[] = [
+    { label: 'Portfolio value', value: '$18,640.90' },
+    { label: '24h P/L', value: '+2.4%', tone: 'positive' },
+    { label: 'Open orders', value: openOrders ? String(openOrders.length) : '—' },
+    { label: 'Total trades', value: '128' },
+  ];
   const [baseSymbol, quoteSymbol] = selectedPair?.symbols ?? [];
   const balances = [
     { symbol: baseSymbol, balance: pairBalance?.base },
@@ -149,74 +147,6 @@ export default function DashboardPage() {
       isActive = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!selectedPair) {
-      return;
-    }
-
-    const controller = new AbortController();
-    const pollIntervalMs = getBalancePollIntervalMs();
-    let timer: number | undefined;
-    let isFetching = false;
-    let isRefreshQueued = false;
-    setPairBalance(null);
-
-    // Each poll is scheduled only after the previous one settles, so slow responses never pile up.
-    const poll = async () => {
-      if (isFetching) {
-        // A refresh requested mid-request (e.g. after a deposit) runs right after it instead of being lost.
-        isRefreshQueued = true;
-        return;
-      }
-      isFetching = true;
-      window.clearTimeout(timer);
-
-      try {
-        const balance = await fetchPairBalance(selectedPair.id, controller.signal);
-        // The response names its pair, so a late answer for a previously selected pair is dropped.
-        if (balance.pair_id === selectedPair.id) {
-          setPairBalance(balance);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error(error);
-        }
-      } finally {
-        isFetching = false;
-      }
-
-      if (controller.signal.aborted || document.hidden) {
-        return;
-      }
-      if (isRefreshQueued) {
-        isRefreshQueued = false;
-        void poll();
-      } else {
-        timer = window.setTimeout(poll, pollIntervalMs);
-      }
-    };
-
-    // Polling pauses while the tab is hidden and refreshes immediately when it is shown again.
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        window.clearTimeout(timer);
-      } else {
-        void poll();
-      }
-    };
-
-    void poll();
-    refreshBalanceRef.current = () => void poll();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      controller.abort();
-      refreshBalanceRef.current = null;
-      window.clearTimeout(timer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [selectedPair]);
 
   useEffect(() => {
     if (!isPairMenuOpen) {
@@ -324,7 +254,9 @@ export default function DashboardPage() {
       <div className="dashboard-grid">
         <section className="panel panel-orders" aria-labelledby="open-orders-title">
           <h2 id="open-orders-title">Open orders</h2>
-          {openOrders.length === 0 ? (
+          {openOrders === null ? (
+            <p className="empty-state">Loading open orders…</p>
+          ) : openOrders.length === 0 ? (
             <p className="empty-state">No open orders yet.</p>
           ) : (
             <table className="orders-table">
@@ -332,21 +264,29 @@ export default function DashboardPage() {
                 <tr>
                   <th>Pair</th>
                   <th>Side</th>
-                  <th>Type</th>
-                  <th>Amount</th>
                   <th>Price</th>
-                  <th>Status</th>
+                  <th>Remaining / Ordered</th>
+                  <th>Created</th>
                 </tr>
               </thead>
               <tbody>
                 {openOrders.map((order) => (
                   <tr key={order.id}>
-                    <td>{order.pair}</td>
+                    <td>{pairLabels.get(order.pair_id) ?? `Pair #${order.pair_id}`}</td>
                     <td className={order.side === 'buy' ? 'side-buy' : 'side-sell'}>{order.side}</td>
-                    <td>{order.type}</td>
-                    <td>{formatAmount(order.amount)}</td>
-                    <td>{formatAmount(order.price)}</td>
-                    <td>{order.status}</td>
+                    <td>{order.price_per_unit}</td>
+                    <td>
+                      {order.remaining_quantity} / {order.quantity_ordered}
+                    </td>
+                    <td
+                      title={
+                        order.last_updated_at
+                          ? `Last updated ${formatOrderTime(order.last_updated_at)}`
+                          : 'Not updated since creation'
+                      }
+                    >
+                      {formatOrderTime(order.created_at)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -414,7 +354,7 @@ export default function DashboardPage() {
         <DepositDialog
           symbols={selectedPair.symbols}
           onClose={() => setIsDepositOpen(false)}
-          onDeposited={() => refreshBalanceRef.current?.()}
+          onDeposited={refreshBalance}
         />
       ) : null}
     </main>
