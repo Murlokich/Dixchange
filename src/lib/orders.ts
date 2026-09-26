@@ -20,8 +20,9 @@ type OrdersResponse = {
 
 const ordersPath = '/api/orders';
 
-export async function fetchOrders(status: string, signal?: AbortSignal): Promise<Order[]> {
-  const query = new URLSearchParams({ status });
+// Statuses are sent as one comma-separated value, e.g. ?status=open,partially_filled.
+export async function fetchOrders(statuses: string[], signal?: AbortSignal): Promise<Order[]> {
+  const query = `status=${statuses.map(encodeURIComponent).join(',')}`;
   const response = await fetch(`${getBackendHost()}${ordersPath}?${query}`, {
     credentials: 'include',
     signal,

@@ -44,7 +44,9 @@ const tradeHistory: Trade[] = [
 const balancePollIntervalMs = readPollIntervalMs(import.meta.env.VITE_BALANCE_POLL_INTERVAL_MS);
 const ordersPollIntervalMs = readPollIntervalMs(import.meta.env.VITE_ORDERS_POLL_INTERVAL_MS);
 
-const fetchOpenOrders: PollFetcher<Order[]> = (signal) => fetchOrders('open', signal);
+const openOrderStatuses = ['open', 'partially_filled'];
+
+const fetchOpenOrders: PollFetcher<Order[]> = (signal) => fetchOrders(openOrderStatuses, signal);
 
 const orderMenuOptions = ['Market order', 'Limit order'];
 

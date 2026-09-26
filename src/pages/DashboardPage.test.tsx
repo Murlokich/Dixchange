@@ -45,7 +45,7 @@ const balanceResponses: Record<number, unknown> = {
   },
 };
 
-const ordersUrl = `${host}/api/orders?status=open`;
+const ordersUrl = `${host}/api/orders?status=open,partially_filled`;
 
 const ordersResponse = {
   orders: [
@@ -69,7 +69,7 @@ const ordersResponse = {
       quantity_filled: '1.50',
       remaining_quantity: '4.50',
       price_per_unit: '4.5',
-      status: 'open',
+      status: 'partially_filled',
       created_at: '2026-09-23T10:10:04Z',
       last_updated_at: '2026-09-24T08:00:00Z',
     },
