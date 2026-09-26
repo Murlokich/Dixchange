@@ -17,7 +17,7 @@ const testTimeout = time.Second
 func newTestOrder() entity.Order {
 	return entity.Order{
 		ID:              uuid.New(),
-		Action:          entity.BuyAction,
+		Side:            entity.BuySide,
 		PricePerUnit:    100,
 		QuantityOrdered: 1,
 	}

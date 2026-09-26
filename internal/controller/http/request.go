@@ -29,3 +29,7 @@ type CreateOrderRequest struct {
 type GetPairBalanceRequest struct {
 	PairID int `uri:"pair_id" binding:"required,min=0"`
 }
+
+type GetOrdersRequest struct {
+	Status string `form:"status" binding:"required,oneof=open"`
+}

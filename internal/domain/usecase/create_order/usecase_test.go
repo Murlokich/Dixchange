@@ -54,7 +54,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 		return order.ID != uuid.Nil &&
 			order.UserID == validUUID &&
 			order.MarketPair == pair &&
-			order.Action == entity.BuyAction &&
+			order.Side == entity.BuySide &&
 			order.QuantityOrdered == validQuantityOrdered &&
 			order.PricePerUnit == validPricePerUnit &&
 			order.Status == entity.StatusOpen
@@ -81,7 +81,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	output, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
-		Action:          entity.BuyAction,
+		Action:          entity.BuySide,
 		QuantityOrdered: validQuantityDecimal,
 		PricePerUnit:    validPriceDecimal,
 	})
@@ -98,7 +98,7 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 		userID uuid.UUID
 		action string
 	}{
-		{name: "nil user id", userID: uuid.Nil, action: entity.BuyAction},
+		{name: "nil user id", userID: uuid.Nil, action: entity.BuySide},
 		{name: "invalid action", userID: validUUID, action: "gibberish"},
 	}
 
@@ -146,7 +146,7 @@ func TestUseCase_Execute_PairDoesNotExist(t *testing.T) {
 	_, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
-		Action:          entity.BuyAction,
+		Action:          entity.BuySide,
 		QuantityOrdered: validQuantityDecimal,
 		PricePerUnit:    validPriceDecimal,
 	})

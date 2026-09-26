@@ -33,7 +33,7 @@ func (o *Order) Fill(quantity int64) error {
 }
 
 func (o *Order) IsSatisfactoryPrice(price int64) bool {
-	if o.Side == entity.BuyAction {
+	if o.Side == entity.BuySide {
 		return price <= o.Price
 	}
 	return price >= o.Price
@@ -48,7 +48,7 @@ func NewOrderFromEntity(order entity.Order) Order {
 		ID:                order.ID,
 		UserID:            order.UserID,
 		OrderType:         LimitOrder,
-		Side:              order.Action,
+		Side:              order.Side,
 		Price:             order.PricePerUnit,
 		RemainingQuantity: order.QuantityOrdered,
 	}

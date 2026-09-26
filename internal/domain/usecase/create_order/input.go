@@ -29,7 +29,7 @@ func (i *Input) Validate(ctx context.Context) error {
 		ctx,
 		i.Action,
 		validation.Required.Error("status cannot be blank"),
-		validation.In(entity.BuyAction, entity.SellAction).Error("is not valid status"),
+		validation.In(entity.BuySide, entity.SellSide).Error("is not valid status"),
 	); err != nil {
 		return entity.ValidationError{Err: err}
 	}

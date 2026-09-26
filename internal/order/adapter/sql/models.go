@@ -7,6 +7,9 @@ package sql
 import (
 	"database/sql/driver"
 	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type OrderAction string
@@ -49,4 +52,17 @@ func (ns NullOrderAction) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.OrderAction), nil
+}
+
+type OrderOrder struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	MarketPairID    int32
+	Action          OrderAction
+	QuantityOrdered int64
+	QuantityFilled  pgtype.Int8
+	Price           int64
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	LastUpdatedAt   pgtype.Timestamptz
 }

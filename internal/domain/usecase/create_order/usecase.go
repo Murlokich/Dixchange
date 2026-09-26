@@ -103,7 +103,7 @@ func (u *UseCase) inputToOrder(input Input) (entity.Order, error) {
 		ID:         id,
 		UserID:     input.UserID,
 		MarketPair: pair,
-		Action:     input.Action,
+		Side:       input.Action,
 		Status:     entity.StatusOpen,
 	}
 

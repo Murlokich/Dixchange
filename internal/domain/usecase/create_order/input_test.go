@@ -34,8 +34,8 @@ func TestInput_Validate_Action(t *testing.T) {
 		isValid            bool
 		containsErrMessage string
 	}{
-		{name: "valid: buy", action: entity.BuyAction, isValid: true},
-		{name: "valid: sell", action: entity.SellAction, isValid: true},
+		{name: "valid: buy", action: entity.BuySide, isValid: true},
+		{name: "valid: sell", action: entity.SellSide, isValid: true},
 		{name: "invalid: empty", action: "", isValid: false, containsErrMessage: "blank"},
 		{name: "invalid: gibberish", action: "asdf", isValid: false, containsErrMessage: "not valid status"},
 	}
@@ -82,7 +82,7 @@ func TestInput_Validate_MarketPairID(t *testing.T) {
 			input := createorder.Input{
 				UserID:          validUUID,
 				MarketPairID:    tc.marketPairID,
-				Action:          entity.BuyAction,
+				Action:          entity.BuySide,
 				QuantityOrdered: validQuantityDecimal,
 				PricePerUnit:    validPriceDecimal,
 			}

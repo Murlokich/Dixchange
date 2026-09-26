@@ -55,51 +55,51 @@ type orderInput struct {
 func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 	orderInputs := []orderInput{
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    80,
 			quantity: 10,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    80,
 			quantity: 15,
 		}, {
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    80,
 			quantity: 1,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    80,
 			quantity: 7,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    79,
 			quantity: 10,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    79,
 			quantity: 10,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    78,
 			quantity: 10,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    78,
 			quantity: 5,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    78,
 			quantity: 2,
 		},
 		{
-			side:     entity.BuyAction,
+			side:     entity.BuySide,
 			price:    81,
 			quantity: 100,
 		},
@@ -156,7 +156,7 @@ func TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels(t *testing.T) {
 func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 	orderInputs := []orderInput{
 		{
-			side:     entity.BuyAction,
+			side:     entity.BuySide,
 			price:    90,
 			quantity: 400,
 		},
@@ -166,12 +166,12 @@ func TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall(t *testing.T) {
 	for price := 91; price >= 85; price-- {
 		orderInputs = append(orderInputs,
 			orderInput{
-				side:     entity.SellAction,
+				side:     entity.SellSide,
 				price:    int64(price),
 				quantity: 10,
 			},
 			orderInput{
-				side:     entity.SellAction,
+				side:     entity.SellSide,
 				price:    int64(price),
 				quantity: 20,
 			},
@@ -243,14 +243,14 @@ func TestBook_AddOrder_FIFO(t *testing.T) {
 	orderInputs := make([]orderInput, ordersPerSideNumber*2)
 	for i := range ordersPerSideNumber {
 		orderInputs[i] = orderInput{
-			side:     entity.BuyAction,
+			side:     entity.BuySide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		}
 	}
 	for i := range ordersPerSideNumber {
 		orderInputs[ordersPerSideNumber+i] = orderInput{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		}
@@ -312,12 +312,12 @@ func TestBook_AddOrder_CancelOrder_PriceLevelSurvives(t *testing.T) {
 
 	orderInputs := []orderInput{
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		},
@@ -356,12 +356,12 @@ func TestBook_AddOrder_CancelOrder_PriceLevelRemoved(t *testing.T) {
 
 	orderInputs := []orderInput{
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		},
 		{
-			side:     entity.SellAction,
+			side:     entity.SellSide,
 			price:    fixedPrice,
 			quantity: fixedQuantity,
 		},
@@ -406,12 +406,12 @@ func TestBook_AddOrder_NonMatchingOrders(t *testing.T) {
 		for range 2 {
 			orderInputs = append(orderInputs,
 				orderInput{
-					side:     entity.BuyAction,
+					side:     entity.BuySide,
 					price:    price,
 					quantity: fixedQuantity,
 				},
 				orderInput{
-					side:     entity.SellAction,
+					side:     entity.SellSide,
 					price:    mxBuyPrice,
 					quantity: fixedQuantity,
 				})
@@ -451,7 +451,7 @@ func TestBook_CancelOrder_DoubleCancellation(t *testing.T) {
 	order := Order{
 		ID:                id,
 		OrderType:         LimitOrder,
-		Side:              entity.BuyAction,
+		Side:              entity.BuySide,
 		Price:             80,
 		RemainingQuantity: 10,
 	}
@@ -484,10 +484,10 @@ func testSteps(t *testing.T, tc *testCase) {
 			require.NoError(t, err)
 			assert.Equal(t, step.wantTrades, trades)
 			if step.topAskQuantity != nil {
-				checkStepTopSideQuantity(t, *book, *step.topAskQuantity, entity.SellAction)
+				checkStepTopSideQuantity(t, *book, *step.topAskQuantity, entity.SellSide)
 			}
 			if step.topBidQuantity != nil {
-				checkStepTopSideQuantity(t, *book, *step.topBidQuantity, entity.BuyAction)
+				checkStepTopSideQuantity(t, *book, *step.topBidQuantity, entity.BuySide)
 			}
 		})
 	}

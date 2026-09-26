@@ -1,7 +1,10 @@
 package http
 
 import (
+	"time"
+
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -20,6 +23,26 @@ type BalanceResponse struct {
 	Main string `json:"main"`
 	// Reserved is the amount locked by open orders as a decimal at the symbol precision.
 	Reserved string `json:"reserved"`
+}
+
+type OrdersResponse struct {
+	Orders []OrderResponse `json:"orders"`
+}
+
+type OrderResponse struct {
+	ID     uuid.UUID `json:"id"`
+	PairID int       `json:"pair_id"`
+	Side   string    `json:"side"`
+	// Quantities are decimals at the base symbol precision.
+	QuantityOrdered   string `json:"quantity_ordered"`
+	QuantityFilled    string `json:"quantity_filled"`
+	RemainingQuantity string `json:"remaining_quantity"`
+	// PricePerUnit is a decimal at the pair price precision.
+	PricePerUnit string `json:"price_per_unit"`
+	Status       string `json:"status"`
+	// Timestamps are RFC 3339 in UTC. LastUpdatedAt is null until the order is first updated.
+	CreatedAt     string  `json:"created_at"`
+	LastUpdatedAt *string `json:"last_updated_at"`
 }
 
 type MarketDataResponse struct {
@@ -76,4 +99,32 @@ func newPairBalanceResponse(pair entity.Pair, base, quote entity.Balance) PairBa
 			Reserved: decimal.New(quote.Reserved, -quotePrecision).StringFixed(quotePrecision),
 		},
 	}
+}
+
+func newOrdersResponse(orders []entity.Order) OrdersResponse {
+	resp := OrdersResponse{Orders: make([]OrderResponse, 0, len(orders))}
+	for _, o := range orders {
+		//nolint:gosec // precisions are smallint in postgres == no overflow
+		basePrecision, pricePrecision := int32(o.MarketPair.Base.Precision), int32(o.MarketPair.PricePrecision)
+
+		var lastUpdatedAt *string
+		if !o.LastUpdatedAt.IsZero() {
+			formatted := o.LastUpdatedAt.UTC().Format(time.RFC3339)
+			lastUpdatedAt = &formatted
+		}
+
+		resp.Orders = append(resp.Orders, OrderResponse{
+			ID:                o.ID,
+			PairID:            o.MarketPair.ID,
+			Side:              o.Side,
+			QuantityOrdered:   decimal.New(o.QuantityOrdered, -basePrecision).StringFixed(basePrecision),
+			QuantityFilled:    decimal.New(o.QuantityFilled, -basePrecision).StringFixed(basePrecision),
+			RemainingQuantity: decimal.New(o.RemainingQuantity(), -basePrecision).StringFixed(basePrecision),
+			PricePerUnit:      decimal.New(o.PricePerUnit, -pricePrecision).StringFixed(pricePrecision),
+			Status:            o.Status,
+			CreatedAt:         o.CreatedAt.UTC().Format(time.RFC3339),
+			LastUpdatedAt:     lastUpdatedAt,
+		})
+	}
+	return resp
 }

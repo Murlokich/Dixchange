@@ -282,7 +282,7 @@ func baseOrder() entity.Order {
 		ID:         uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3e33"),
 		UserID:     uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3e44"),
 		MarketPair: validPair(),
-		Action:     entity.BuyAction,
+		Side:       entity.BuySide,
 		Status:     entity.StatusOpen,
 	}
 }

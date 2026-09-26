@@ -6,6 +6,7 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
 	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
@@ -25,6 +26,7 @@ const (
 	getMarketDataFailureResponse           = "Market data retrieval failed due to internal error"
 	getPairBalanceFailureResponse          = "Pair balance retrieval failed due to internal error"
 	getPairBalanceNotFoundResponse         = "Balance not found"
+	getOrdersFailureResponse               = "Orders retrieval failed due to internal error"
 
 	errorField = "error"
 
@@ -212,4 +214,37 @@ func getPairBalanceHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.JSON(http.StatusOK, newPairBalanceResponse(output.Pair, output.Base, output.Quote))
+}
+
+func getOrdersHandler(c *gin.Context, deps *Dependencies) {
+	var req GetOrdersRequest
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	output, err := deps.GetOrders.Execute(c, getorders.Input{
+		UserID: userID,
+		Status: req.Status,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getOrdersFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newOrdersResponse(output.Orders))
 }

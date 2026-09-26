@@ -23,6 +23,7 @@ func RegisterEndpoints(router *gin.Engine, d *Dependencies) {
 
 	orderRouter := apiRouter.Group("orders")
 	orderRouter.POST("", d.WrapHandler(authMiddleware), d.WrapHandler(createOrderHandler))
+	orderRouter.GET("", d.WrapHandler(authMiddleware), d.WrapHandler(getOrdersHandler))
 
 	marketRouter := apiRouter.Group("market")
 	marketRouter.GET("/pairs", d.WrapHandler(getMarketDataHandler))

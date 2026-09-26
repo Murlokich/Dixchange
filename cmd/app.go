@@ -15,6 +15,7 @@ import (
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
+	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
 	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
@@ -163,6 +164,7 @@ func main() {
 	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter, bookWriter)
 	getMarketDataUseCase := getmarketdata.NewUseCase(marketCache)
 	getPairBalanceUseCase := getpairbalance.NewUseCase(balanceRepo, marketCache)
+	getOrdersUseCase := getorders.NewUseCase(orderRepo, marketCache)
 
 	deps := api.Dependencies{
 		Logger:         log,
@@ -173,6 +175,7 @@ func main() {
 		CreateOrder:    createOrderUseCase,
 		GetMarketData:  getMarketDataUseCase,
 		GetPairBalance: getPairBalanceUseCase,
+		GetOrders:      getOrdersUseCase,
 	}
 
 	router := gin.Default()

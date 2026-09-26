@@ -96,7 +96,7 @@ func NewBook(cfg *config.OrderBook, pair entity.Pair) *Book {
 
 // returns pointer to the requested side.
 func (b *Book) sameSide(side string) bookSide {
-	if side == entity.BuyAction {
+	if side == entity.BuySide {
 		return b.bids
 	}
 	return b.asks
@@ -104,7 +104,7 @@ func (b *Book) sameSide(side string) bookSide {
 
 // returns pointer to the opposite of the requested side.
 func (b *Book) oppositeSide(side string) bookSide {
-	if side == entity.BuyAction {
+	if side == entity.BuySide {
 		return b.asks
 	}
 	return b.bids
@@ -115,7 +115,7 @@ func (b *Book) oppositeSide(side string) bookSide {
 func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 	var askOrder, bidOrder *Order
 	// determine which order is ask and bid
-	if restingOrder.Side == entity.BuyAction {
+	if restingOrder.Side == entity.BuySide {
 		askOrder, bidOrder = newOrder, restingOrder
 	} else {
 		askOrder, bidOrder = restingOrder, newOrder

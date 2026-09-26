@@ -11,3 +11,7 @@ SET quantity_filled = COALESCE(quantity_filled, 0) + sqlc.arg(quantity)::bigint,
     END,
     last_updated_at = NOW()
 WHERE id = sqlc.arg(order_id);
+
+
+-- name: GetUserOrdersByStatus :many
+SELECT * FROM "order"."order" WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC;
