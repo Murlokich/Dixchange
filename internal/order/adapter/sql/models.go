@@ -60,7 +60,7 @@ type OrderOrder struct {
 	MarketPairID    int32
 	Action          OrderAction
 	QuantityOrdered int64
-	QuantityFilled  pgtype.Int8
+	QuantityFilled  int64
 	Price           int64
 	Status          string
 	CreatedAt       pgtype.Timestamptz

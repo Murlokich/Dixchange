@@ -44,7 +44,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order entity.Order) error 
 }
 
 // FillOrder adds quantity to the filled quantity of the order and marks it filled
-// once the ordered quantity is reached.
+// once the ordered quantity is reached, partially filled otherwise.
 func (r *Repository) FillOrder(ctx context.Context, orderID uuid.UUID, quantity int64) error {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
@@ -63,19 +63,23 @@ func (r *Repository) FillOrder(ctx context.Context, orderID uuid.UUID, quantity 
 	return nil
 }
 
-// GetUserOrdersByStatus returns the user orders with the given status, newest first. The returned orders
-// carry only the market pair ID; the caller resolves the rest of the pair.
-func (r *Repository) GetUserOrdersByStatus(
+// GetUserOrdersByStatuses returns the user orders with any of the given statuses, newest first.
+// The returned orders carry only the market pair ID; the caller resolves the rest of the pair.
+func (r *Repository) GetUserOrdersByStatuses(
 	ctx context.Context,
 	userID uuid.UUID,
-	status string,
+	statuses []string,
 ) ([]entity.Order, error) {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	rows, err := q.GetUserOrdersByStatus(ctx, GetUserOrdersByStatusParams{UserID: userID, Status: status})
+	rows, err := q.GetUserOrdersByStatuses(ctx, GetUserOrdersByStatusesParams{
+		UserID: userID,
+		// sqlc can't infer a name for the ANY($2::text[]) parameter
+		Column2: statuses,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "query get user orders by status")
+		return nil, errors.Wrap(err, "query get user orders by statuses")
 	}
 
 	orders := make([]entity.Order, 0, len(rows))
@@ -86,13 +90,12 @@ func (r *Repository) GetUserOrdersByStatus(
 			MarketPair:      entity.Pair{ID: int(row.MarketPairID)},
 			Side:            string(row.Action),
 			QuantityOrdered: row.QuantityOrdered,
-			// NULL quantity_filled and last_updated_at mean the order was never filled
-			// or updated, so their zero values are the right domain values.
-			QuantityFilled: row.QuantityFilled.Int64,
-			PricePerUnit:   row.Price,
-			Status:         row.Status,
-			CreatedAt:      row.CreatedAt.Time,
-			LastUpdatedAt:  row.LastUpdatedAt.Time,
+			QuantityFilled:  row.QuantityFilled,
+			PricePerUnit:    row.Price,
+			Status:          row.Status,
+			CreatedAt:       row.CreatedAt.Time,
+			// NULL last_updated_at means the order was never updated, so the zero time is right.
+			LastUpdatedAt: row.LastUpdatedAt.Time,
 		})
 	}
 	return orders, nil

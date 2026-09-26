@@ -31,5 +31,6 @@ type GetPairBalanceRequest struct {
 }
 
 type GetOrdersRequest struct {
-	Status string `form:"status" binding:"required,oneof=open"`
+	// Statuses come comma separated, e.g. ?status=open,partially_filled
+	Statuses []string `form:"status" collection_format:"csv" binding:"required,dive,oneof=open partially_filled"`
 }

@@ -39,48 +39,48 @@ func (_m *MockOrderRepository) EXPECT() *MockOrderRepository_Expecter {
 	return &MockOrderRepository_Expecter{mock: &_m.Mock}
 }
 
-// GetUserOrdersByStatus provides a mock function for the type MockOrderRepository
-func (_mock *MockOrderRepository) GetUserOrdersByStatus(ctx context.Context, userID uuid.UUID, status string) ([]entity.Order, error) {
-	ret := _mock.Called(ctx, userID, status)
+// GetUserOrdersByStatuses provides a mock function for the type MockOrderRepository
+func (_mock *MockOrderRepository) GetUserOrdersByStatuses(ctx context.Context, userID uuid.UUID, statuses []string) ([]entity.Order, error) {
+	ret := _mock.Called(ctx, userID, statuses)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetUserOrdersByStatus")
+		panic("no return value specified for GetUserOrdersByStatuses")
 	}
 
 	var r0 []entity.Order
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) ([]entity.Order, error)); ok {
-		return returnFunc(ctx, userID, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, []string) ([]entity.Order, error)); ok {
+		return returnFunc(ctx, userID, statuses)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) []entity.Order); ok {
-		r0 = returnFunc(ctx, userID, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, []string) []entity.Order); ok {
+		r0 = returnFunc(ctx, userID, statuses)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]entity.Order)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, string) error); ok {
-		r1 = returnFunc(ctx, userID, status)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, []string) error); ok {
+		r1 = returnFunc(ctx, userID, statuses)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockOrderRepository_GetUserOrdersByStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserOrdersByStatus'
-type MockOrderRepository_GetUserOrdersByStatus_Call struct {
+// MockOrderRepository_GetUserOrdersByStatuses_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserOrdersByStatuses'
+type MockOrderRepository_GetUserOrdersByStatuses_Call struct {
 	*mock.Call
 }
 
-// GetUserOrdersByStatus is a helper method to define mock.On call
+// GetUserOrdersByStatuses is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userID uuid.UUID
-//   - status string
-func (_e *MockOrderRepository_Expecter) GetUserOrdersByStatus(ctx any, userID any, status any) *MockOrderRepository_GetUserOrdersByStatus_Call {
-	return &MockOrderRepository_GetUserOrdersByStatus_Call{Call: _e.mock.On("GetUserOrdersByStatus", ctx, userID, status)}
+//   - statuses []string
+func (_e *MockOrderRepository_Expecter) GetUserOrdersByStatuses(ctx any, userID any, statuses any) *MockOrderRepository_GetUserOrdersByStatuses_Call {
+	return &MockOrderRepository_GetUserOrdersByStatuses_Call{Call: _e.mock.On("GetUserOrdersByStatuses", ctx, userID, statuses)}
 }
 
-func (_c *MockOrderRepository_GetUserOrdersByStatus_Call) Run(run func(ctx context.Context, userID uuid.UUID, status string)) *MockOrderRepository_GetUserOrdersByStatus_Call {
+func (_c *MockOrderRepository_GetUserOrdersByStatuses_Call) Run(run func(ctx context.Context, userID uuid.UUID, statuses []string)) *MockOrderRepository_GetUserOrdersByStatuses_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -90,9 +90,9 @@ func (_c *MockOrderRepository_GetUserOrdersByStatus_Call) Run(run func(ctx conte
 		if args[1] != nil {
 			arg1 = args[1].(uuid.UUID)
 		}
-		var arg2 string
+		var arg2 []string
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].([]string)
 		}
 		run(
 			arg0,
@@ -103,12 +103,12 @@ func (_c *MockOrderRepository_GetUserOrdersByStatus_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *MockOrderRepository_GetUserOrdersByStatus_Call) Return(orders []entity.Order, err error) *MockOrderRepository_GetUserOrdersByStatus_Call {
+func (_c *MockOrderRepository_GetUserOrdersByStatuses_Call) Return(orders []entity.Order, err error) *MockOrderRepository_GetUserOrdersByStatuses_Call {
 	_c.Call.Return(orders, err)
 	return _c
 }
 
-func (_c *MockOrderRepository_GetUserOrdersByStatus_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, status string) ([]entity.Order, error)) *MockOrderRepository_GetUserOrdersByStatus_Call {
+func (_c *MockOrderRepository_GetUserOrdersByStatuses_Call) RunAndReturn(run func(ctx context.Context, userID uuid.UUID, statuses []string) ([]entity.Order, error)) *MockOrderRepository_GetUserOrdersByStatuses_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type OrderRepository interface {
-	GetUserOrdersByStatus(ctx context.Context, userID uuid.UUID, status string) ([]entity.Order, error)
+	GetUserOrdersByStatuses(ctx context.Context, userID uuid.UUID, statuses []string) ([]entity.Order, error)
 }
 
 type MarketRepository interface {
@@ -26,9 +26,9 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
 
-	orders, err := u.orderRepo.GetUserOrdersByStatus(ctx, input.UserID, input.Status)
+	orders, err := u.orderRepo.GetUserOrdersByStatuses(ctx, input.UserID, input.Statuses)
 	if err != nil {
-		return Output{}, errors.Wrap(err, "order repo get user orders by status")
+		return Output{}, errors.Wrap(err, "order repo get user orders by statuses")
 	}
 
 	// the repository returns only the pair ID, the rest of the pair comes from the market

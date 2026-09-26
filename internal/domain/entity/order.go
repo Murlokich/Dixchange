@@ -11,9 +11,10 @@ const (
 	BuySide  = "buy"
 	SellSide = "sell"
 
-	StatusOpen      = "open"
-	StatusFilled    = "filled"
-	StatusCancelled = "cancelled"
+	StatusOpen            = "open"
+	StatusPartiallyFilled = "partially_filled"
+	StatusFilled          = "filled"
+	StatusCancelled       = "cancelled"
 )
 
 type Order struct {

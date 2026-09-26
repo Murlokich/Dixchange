@@ -11,8 +11,8 @@ import (
 )
 
 type Input struct {
-	UserID uuid.UUID
-	Status string
+	UserID   uuid.UUID
+	Statuses []string
 }
 
 func (i *Input) Validate(ctx context.Context) error {
@@ -20,14 +20,18 @@ func (i *Input) Validate(ctx context.Context) error {
 		return errors.Wrap(entity.ValidationError{Err: err}, "validate user id")
 	}
 
-	// only open orders can be fetched for now
+	// only active orders can be fetched for now
 	if err := validation.ValidateWithContext(
 		ctx,
-		i.Status,
+		i.Statuses,
 		validation.Required,
-		validation.In(entity.StatusOpen).Error("is not supported status"),
+		validation.Each(
+			// In accepts empty values, so Required rejects an empty status in the list
+			validation.Required,
+			validation.In(entity.StatusOpen, entity.StatusPartiallyFilled).Error("is not supported status"),
+		),
 	); err != nil {
-		return errors.Wrap(entity.ValidationError{Err: err}, "validate status")
+		return errors.Wrap(entity.ValidationError{Err: err}, "validate statuses")
 	}
 
 	return nil

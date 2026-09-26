@@ -233,8 +233,8 @@ func getOrdersHandler(c *gin.Context, deps *Dependencies) {
 	}
 
 	output, err := deps.GetOrders.Execute(c, getorders.Input{
-		UserID: userID,
-		Status: req.Status,
+		UserID:   userID,
+		Statuses: req.Statuses,
 	})
 	if err != nil {
 		if errors.As(err, &entity.ValidationError{}) {

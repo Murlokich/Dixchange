@@ -4,14 +4,14 @@ INSERT INTO "order"."order" (id, user_id, market_pair_id, action, quantity_order
 
 -- name: FillOrder :execrows
 UPDATE "order"."order"
-SET quantity_filled = COALESCE(quantity_filled, 0) + sqlc.arg(quantity)::bigint,
+SET quantity_filled = quantity_filled + sqlc.arg(quantity)::bigint,
     status = CASE
-        WHEN COALESCE(quantity_filled, 0) + sqlc.arg(quantity)::bigint >= quantity_ordered THEN 'filled'
-        ELSE status
+        WHEN quantity_filled + sqlc.arg(quantity)::bigint >= quantity_ordered THEN 'filled'
+        ELSE 'partially_filled'
     END,
     last_updated_at = NOW()
 WHERE id = sqlc.arg(order_id);
 
 
--- name: GetUserOrdersByStatus :many
-SELECT * FROM "order"."order" WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC;
+-- name: GetUserOrdersByStatuses :many
+SELECT * FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC;

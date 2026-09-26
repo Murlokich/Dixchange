@@ -41,10 +41,10 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 
 const fillOrder = `-- name: FillOrder :execrows
 UPDATE "order"."order"
-SET quantity_filled = COALESCE(quantity_filled, 0) + $1::bigint,
+SET quantity_filled = quantity_filled + $1::bigint,
     status = CASE
-        WHEN COALESCE(quantity_filled, 0) + $1::bigint >= quantity_ordered THEN 'filled'
-        ELSE status
+        WHEN quantity_filled + $1::bigint >= quantity_ordered THEN 'filled'
+        ELSE 'partially_filled'
     END,
     last_updated_at = NOW()
 WHERE id = $2
@@ -63,17 +63,17 @@ func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
-const getUserOrdersByStatus = `-- name: GetUserOrdersByStatus :many
-SELECT id, user_id, market_pair_id, action, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC
+const getUserOrdersByStatuses = `-- name: GetUserOrdersByStatuses :many
+SELECT id, user_id, market_pair_id, action, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC
 `
 
-type GetUserOrdersByStatusParams struct {
-	UserID uuid.UUID
-	Status string
+type GetUserOrdersByStatusesParams struct {
+	UserID  uuid.UUID
+	Column2 []string
 }
 
-func (q *Queries) GetUserOrdersByStatus(ctx context.Context, arg GetUserOrdersByStatusParams) ([]OrderOrder, error) {
-	rows, err := q.db.Query(ctx, getUserOrdersByStatus, arg.UserID, arg.Status)
+func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrdersByStatusesParams) ([]OrderOrder, error) {
+	rows, err := q.db.Query(ctx, getUserOrdersByStatuses, arg.UserID, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
