@@ -30,6 +30,25 @@ type Trade struct {
 	CreatedAt  time.Time
 }
 
+// UserTradeParty is the part of a trade that belongs to one user: the side they took
+// and the order of theirs that was matched.
+type UserTradeParty struct {
+	Side    string
+	OrderID uuid.UUID
+}
+
+// PartyByUserID returns the part of the trade that belongs to the user. A user who traded
+// against their own order is reported as the buyer.
+func (t *Trade) PartyByUserID(userID uuid.UUID) (UserTradeParty, error) {
+	switch userID {
+	case t.Bid.UserID:
+		return UserTradeParty{Side: BuySide, OrderID: t.Bid.OrderID}, nil
+	case t.Ask.UserID:
+		return UserTradeParty{Side: SellSide, OrderID: t.Ask.OrderID}, nil
+	}
+	return UserTradeParty{}, errors.Wrapf(ErrNotTradeParticipant, "user %s, trade %s", userID, t.ID)
+}
+
 // Notional returns what the buyer pays for the trade, in quote minor units.
 func (t *Trade) Notional() (int64, error) {
 	amount, err := t.MarketPair.Notional(t.Quantity, t.Price)

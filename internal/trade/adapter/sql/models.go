@@ -3,3 +3,20 @@
 //   sqlc v1.31.1
 
 package sql
+
+import (
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type TradeTrade struct {
+	ID          uuid.UUID
+	BuyOrderID  uuid.UUID
+	SellOrderID uuid.UUID
+	Price       int64
+	Quantity    int64
+	CreatedAt   pgtype.Timestamptz
+	BuyerID     uuid.UUID
+	SellerID    uuid.UUID
+	PairID      int32
+}

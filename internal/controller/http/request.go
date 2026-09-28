@@ -34,3 +34,8 @@ type GetOrdersRequest struct {
 	// Statuses come comma separated, e.g. ?status=open,partially_filled
 	Statuses []string `form:"status" collection_format:"csv" binding:"required,dive,oneof=open partially_filled"`
 }
+
+type GetTradesRequest struct {
+	// Cursor is the next_cursor of the previous page; empty for the first page.
+	Cursor string `form:"cursor" binding:"omitempty,uuid"`
+}

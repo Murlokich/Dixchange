@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/pkg/errors"
+)
 
 type Config struct {
 	HTTPConfig        HTTPConfig        `envconfig:"HTTP"`
@@ -10,6 +14,15 @@ type Config struct {
 	BookWriterConfig  BookWriterConfig  `envconfig:"BOOK_WRITER"`
 	OrderBookConfig   OrderBook         `envconfig:"ORDER_BOOK"`
 	TradeWriterConfig TradeWriterConfig `envconfig:"TRADE_WRITER"`
+	TradeHistory      TradeHistory      `envconfig:"TRADE_HISTORY"`
+}
+
+// Validate checks the values envconfig can't: those that parse fine but make no sense.
+func (c *Config) Validate() error {
+	if err := c.TradeHistory.Validate(); err != nil {
+		return errors.Wrap(err, "trade history")
+	}
+	return nil
 }
 
 type HTTPConfig struct {
@@ -49,4 +62,17 @@ type BookWriterConfig struct {
 
 type TradeWriterConfig struct {
 	BufferSize int `default:"100" split_words:"true"`
+}
+
+type TradeHistory struct {
+	// PageSize is how many trades a single trade history page holds. It is fixed on the
+	// server so a client can't request arbitrarily large pages.
+	PageSize int `default:"20" split_words:"true"`
+}
+
+func (t *TradeHistory) Validate() error {
+	if t.PageSize < 1 {
+		return errors.Errorf("page size must be positive, got %d", t.PageSize)
+	}
+	return nil
 }

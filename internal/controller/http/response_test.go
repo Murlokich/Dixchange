@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -162,4 +163,67 @@ func TestNewOrdersResponse_NoOrdersIsEmptyArray(t *testing.T) {
 
 	require.NoError(t, err)
 	require.JSONEq(t, `{"orders": []}`, string(body))
+}
+
+func TestNewTradesResponse_JSON(t *testing.T) {
+	t.Parallel()
+
+	btcUsd := entity.Pair{
+		ID:             2,
+		Base:           entity.Symbol{ID: 3, Code: "BTC", Precision: 8},
+		Quote:          entity.Symbol{ID: 1, Code: "USD", Precision: 2},
+		LotSize:        1000,
+		PriceTick:      5,
+		PricePrecision: 2,
+	}
+	cet := time.FixedZone("CET", 60*60)
+	cursor := uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3eb1")
+
+	output := gettrades.Output{
+		Trades: []gettrades.UserTrade{
+			{
+				Trade: entity.Trade{
+					ID:         uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3eb1"),
+					MarketPair: btcUsd,
+					Price:      6500050,
+					Quantity:   123000,
+					CreatedAt:  time.Date(2026, 9, 28, 13, 4, 5, 0, cet),
+				},
+				Party: entity.UserTradeParty{
+					Side:    entity.SellSide,
+					OrderID: uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3e0a"),
+				},
+				Total: 7995061,
+			},
+		},
+		NextCursor: &cursor,
+	}
+
+	body, err := json.Marshal(newTradesResponse(output))
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"trades": [
+			{
+				"id": "019f7f2c-0caa-70ab-b1ec-414f744c3eb1",
+				"pair_id": 2,
+				"order_id": "019f7f2c-0caa-70ab-b1ec-414f744c3e0a",
+				"side": "sell",
+				"amount": "0.00123000",
+				"price": "65000.50",
+				"total": "79950.61",
+				"executed_at": "2026-09-28T12:04:05Z"
+			}
+		],
+		"next_cursor": "019f7f2c-0caa-70ab-b1ec-414f744c3eb1"
+	}`, string(body))
+}
+
+func TestNewTradesResponse_LastPageHasNullCursor(t *testing.T) {
+	t.Parallel()
+
+	body, err := json.Marshal(newTradesResponse(gettrades.Output{}))
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{"trades": [], "next_cursor": null}`, string(body))
 }

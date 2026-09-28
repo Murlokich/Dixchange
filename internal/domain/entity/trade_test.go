@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,6 +119,58 @@ func TestTrade_GetExcessReservedAmount(t *testing.T) {
 			if tc.errContains != "" {
 				require.ErrorContains(t, err, tc.errContains)
 				require.Zero(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestTrade_PartyOf(t *testing.T) {
+	t.Parallel()
+
+	buyer, seller, stranger := uuid.New(), uuid.New(), uuid.New()
+	bidOrder, askOrder := uuid.New(), uuid.New()
+	trade := entity.Trade{
+		Bid: entity.TradeParty{UserID: buyer, OrderID: bidOrder},
+		Ask: entity.TradeParty{UserID: seller, OrderID: askOrder},
+	}
+	selfTrade := entity.Trade{
+		Bid: entity.TradeParty{UserID: buyer, OrderID: bidOrder},
+		Ask: entity.TradeParty{UserID: buyer, OrderID: askOrder},
+	}
+
+	testCases := []struct {
+		name    string
+		trade   entity.Trade
+		userID  uuid.UUID
+		want    entity.UserTradeParty
+		wantErr bool
+	}{
+		{name: "buyer", trade: trade, userID: buyer, want: entity.UserTradeParty{Side: entity.BuySide, OrderID: bidOrder}},
+		{
+			name:   "seller",
+			trade:  trade,
+			userID: seller,
+			want:   entity.UserTradeParty{Side: entity.SellSide, OrderID: askOrder},
+		},
+		{
+			name:   "self trade is reported as buy",
+			trade:  selfTrade,
+			userID: buyer,
+			want:   entity.UserTradeParty{Side: entity.BuySide, OrderID: bidOrder},
+		},
+		{name: "not a participant", trade: trade, userID: stranger, wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tc.trade.PartyByUserID(tc.userID)
+			if tc.wantErr {
+				require.ErrorIs(t, err, entity.ErrNotTradeParticipant)
 				return
 			}
 			require.NoError(t, err)

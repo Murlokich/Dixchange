@@ -73,6 +73,7 @@ func (s *TradeService) Run(ctx context.Context) {
 // settlement is applied within one transaction, so a trade is either fully settled
 // or not settled at all.
 func (s *TradeService) executeTrade(ctx context.Context, trade entity.Trade) error {
+	// trade history pages by trade ID, which relies on UUIDv7 IDs being time ordered
 	id, idErr := uuid.NewV7()
 	if idErr != nil {
 		return pkgerrors.Wrap(idErr, "gen trade id")

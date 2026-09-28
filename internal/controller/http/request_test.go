@@ -50,3 +50,41 @@ func TestGetOrdersRequest_BindQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTradesRequest_BindQuery(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		query      string
+		wantCursor string
+		wantErr    bool
+	}{
+		{name: "first page", query: "", wantCursor: ""},
+		{
+			name:       "cursor",
+			query:      "cursor=019f7f2c-0caa-70ab-b1ec-414f744c3e33",
+			wantCursor: "019f7f2c-0caa-70ab-b1ec-414f744c3e33",
+		},
+		{name: "not a uuid", query: "cursor=2026-09-28", wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/trades?"+tc.query, nil)
+
+			var req GetTradesRequest
+			err := c.ShouldBindQuery(&req)
+
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.wantCursor, req.Cursor)
+		})
+	}
+}

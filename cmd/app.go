@@ -17,6 +17,7 @@ import (
 	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
 	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
 	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
+	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
@@ -100,6 +101,10 @@ func main() {
 		log.Errorf("process config: %v", err)
 		return
 	}
+	if err := cfg.Validate(); err != nil {
+		log.Errorf("validate config: %v", err)
+		return
+	}
 
 	if err := runMigrations(&cfg.DBConfig); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		log.Errorf("run migrations: %v", err)
@@ -165,6 +170,7 @@ func main() {
 	getMarketDataUseCase := getmarketdata.NewUseCase(marketCache)
 	getPairBalanceUseCase := getpairbalance.NewUseCase(balanceRepo, marketCache)
 	getOrdersUseCase := getorders.NewUseCase(orderRepo, marketCache)
+	getTradesUseCase := gettrades.NewUseCase(tradeRepo, marketCache, cfg.TradeHistory.PageSize)
 
 	deps := api.Dependencies{
 		Logger:         log,
@@ -176,6 +182,7 @@ func main() {
 		GetMarketData:  getMarketDataUseCase,
 		GetPairBalance: getPairBalanceUseCase,
 		GetOrders:      getOrdersUseCase,
+		GetTrades:      getTradesUseCase,
 	}
 
 	router := gin.Default()
