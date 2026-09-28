@@ -17,19 +17,19 @@ func TestOrder_GetDebitAsset(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		action    string
+		side      string
 		wantAsset entity.Symbol
 		wantErr   bool
 	}{
-		{name: "buy", action: entity.BuySide, wantAsset: testPair.Quote},
-		{name: "sell", action: entity.SellSide, wantAsset: testPair.Base},
-		{name: "invalid action", action: "gibberish", wantErr: true},
+		{name: "buy", side: entity.BuySide, wantAsset: testPair.Quote},
+		{name: "sell", side: entity.SellSide, wantAsset: testPair.Base},
+		{name: "invalid side", side: "gibberish", wantErr: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{MarketPair: testPair, Side: tc.action}
+			order := entity.Order{MarketPair: testPair, Side: tc.side}
 			asset, err := order.GetDebitAsset()
 			if tc.wantErr {
 				require.Error(t, err)
@@ -113,19 +113,19 @@ func TestOrder_GetCreditAsset(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		action    string
+		side      string
 		wantAsset entity.Symbol
 		wantErr   bool
 	}{
-		{name: "buy", action: entity.BuySide, wantAsset: testPair.Base},
-		{name: "sell", action: entity.SellSide, wantAsset: testPair.Quote},
-		{name: "invalid action", action: "gibberish", wantErr: true},
+		{name: "buy", side: entity.BuySide, wantAsset: testPair.Base},
+		{name: "sell", side: entity.SellSide, wantAsset: testPair.Quote},
+		{name: "invalid side", side: "gibberish", wantErr: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{MarketPair: testPair, Side: tc.action}
+			order := entity.Order{MarketPair: testPair, Side: tc.side}
 			asset, err := order.GetCreditAsset()
 			if tc.wantErr {
 				require.Error(t, err)

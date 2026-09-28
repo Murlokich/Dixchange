@@ -25,19 +25,19 @@ var (
 	validPriceDecimal    = decimal.NewFromInt(validPricePerUnit)    //nolint:gochecknoglobals // acceptable in test
 )
 
-func TestInput_Validate_Action(t *testing.T) {
+func TestInput_Validate_Side(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		name               string
-		action             string
+		side               string
 		isValid            bool
 		containsErrMessage string
 	}{
-		{name: "valid: buy", action: entity.BuySide, isValid: true},
-		{name: "valid: sell", action: entity.SellSide, isValid: true},
-		{name: "invalid: empty", action: "", isValid: false, containsErrMessage: "blank"},
-		{name: "invalid: gibberish", action: "asdf", isValid: false, containsErrMessage: "not valid status"},
+		{name: "valid: buy", side: entity.BuySide, isValid: true},
+		{name: "valid: sell", side: entity.SellSide, isValid: true},
+		{name: "invalid: empty", side: "", isValid: false, containsErrMessage: "blank"},
+		{name: "invalid: gibberish", side: "asdf", isValid: false, containsErrMessage: "not valid side"},
 	}
 
 	for _, tc := range testCases {
@@ -46,7 +46,7 @@ func TestInput_Validate_Action(t *testing.T) {
 			input := createorder.Input{
 				UserID:          validUUID,
 				MarketPairID:    validMarketPairID,
-				Action:          tc.action,
+				Side:            tc.side,
 				QuantityOrdered: validQuantityDecimal,
 				PricePerUnit:    validPriceDecimal,
 			}
@@ -82,7 +82,7 @@ func TestInput_Validate_MarketPairID(t *testing.T) {
 			input := createorder.Input{
 				UserID:          validUUID,
 				MarketPairID:    tc.marketPairID,
-				Action:          entity.BuySide,
+				Side:            entity.BuySide,
 				QuantityOrdered: validQuantityDecimal,
 				PricePerUnit:    validPriceDecimal,
 			}

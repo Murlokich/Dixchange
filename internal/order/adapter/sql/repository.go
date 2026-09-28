@@ -22,8 +22,8 @@ func (r *Repository) CreateOrder(ctx context.Context, order entity.Order) error 
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	var action OrderAction
-	if err := action.Scan(order.Side); err != nil {
+	var side OrderSide
+	if err := side.Scan(order.Side); err != nil {
 		return errors.Wrap(err, "order side scan")
 	}
 
@@ -32,7 +32,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order entity.Order) error 
 		UserID: order.UserID,
 		//nolint:gosec //int32 is sqlc gen type + is not expected to overflow
 		MarketPairID:    int32(order.MarketPair.ID),
-		Action:          action,
+		Side:            side,
 		QuantityOrdered: order.QuantityOrdered,
 		Price:           order.PricePerUnit,
 		Status:          order.Status,
@@ -88,7 +88,7 @@ func (r *Repository) GetUserOrdersByStatuses(
 			ID:              row.ID,
 			UserID:          row.UserID,
 			MarketPair:      entity.Pair{ID: int(row.MarketPairID)},
-			Side:            string(row.Action),
+			Side:            string(row.Side),
 			QuantityOrdered: row.QuantityOrdered,
 			QuantityFilled:  row.QuantityFilled,
 			PricePerUnit:    row.Price,

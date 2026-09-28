@@ -12,53 +12,53 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type OrderAction string
+type OrderSide string
 
 const (
-	OrderActionBuy  OrderAction = "buy"
-	OrderActionSell OrderAction = "sell"
+	OrderSideBuy  OrderSide = "buy"
+	OrderSideSell OrderSide = "sell"
 )
 
-func (e *OrderAction) Scan(src interface{}) error {
+func (e *OrderSide) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = OrderAction(s)
+		*e = OrderSide(s)
 	case string:
-		*e = OrderAction(s)
+		*e = OrderSide(s)
 	default:
-		return fmt.Errorf("unsupported scan type for OrderAction: %T", src)
+		return fmt.Errorf("unsupported scan type for OrderSide: %T", src)
 	}
 	return nil
 }
 
-type NullOrderAction struct {
-	OrderAction OrderAction
-	Valid       bool // Valid is true if OrderAction is not NULL
+type NullOrderSide struct {
+	OrderSide OrderSide
+	Valid     bool // Valid is true if OrderSide is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullOrderAction) Scan(value interface{}) error {
+func (ns *NullOrderSide) Scan(value interface{}) error {
 	if value == nil {
-		ns.OrderAction, ns.Valid = "", false
+		ns.OrderSide, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.OrderAction.Scan(value)
+	return ns.OrderSide.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullOrderAction) Value() (driver.Value, error) {
+func (ns NullOrderSide) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.OrderAction), nil
+	return string(ns.OrderSide), nil
 }
 
 type OrderOrder struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID
 	MarketPairID    int32
-	Action          OrderAction
+	Side            OrderSide
 	QuantityOrdered int64
 	QuantityFilled  int64
 	Price           int64

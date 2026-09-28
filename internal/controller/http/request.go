@@ -21,7 +21,7 @@ type DepositRequest struct {
 
 type CreateOrderRequest struct {
 	MarketPairID    int             `json:"market_pair_id" binding:"required,min=0"`
-	Action          string          `json:"action" binding:"required,oneof=buy sell"`
+	Side            string          `json:"side" binding:"required,oneof=buy sell"`
 	QuantityOrdered decimal.Decimal `json:"quantity_ordered"`
 	PricePerUnit    decimal.Decimal `json:"price_per_unit"`
 }

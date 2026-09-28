@@ -12,7 +12,7 @@ import (
 )
 
 const createOrder = `-- name: CreateOrder :exec
-INSERT INTO "order"."order" (id, user_id, market_pair_id, action, quantity_ordered, price, status)
+INSERT INTO "order"."order" (id, user_id, market_pair_id, side, quantity_ordered, price, status)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
@@ -20,7 +20,7 @@ type CreateOrderParams struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID
 	MarketPairID    int32
-	Action          OrderAction
+	Side            OrderSide
 	QuantityOrdered int64
 	Price           int64
 	Status          string
@@ -31,7 +31,7 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 		arg.ID,
 		arg.UserID,
 		arg.MarketPairID,
-		arg.Action,
+		arg.Side,
 		arg.QuantityOrdered,
 		arg.Price,
 		arg.Status,
@@ -64,7 +64,7 @@ func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, er
 }
 
 const getUserOrdersByStatuses = `-- name: GetUserOrdersByStatuses :many
-SELECT id, user_id, market_pair_id, action, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC
+SELECT id, user_id, market_pair_id, side, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC
 `
 
 type GetUserOrdersByStatusesParams struct {
@@ -85,7 +85,7 @@ func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrders
 			&i.ID,
 			&i.UserID,
 			&i.MarketPairID,
-			&i.Action,
+			&i.Side,
 			&i.QuantityOrdered,
 			&i.QuantityFilled,
 			&i.Price,

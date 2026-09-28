@@ -81,7 +81,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	output, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
-		Action:          entity.BuySide,
+		Side:            entity.BuySide,
 		QuantityOrdered: validQuantityDecimal,
 		PricePerUnit:    validPriceDecimal,
 	})
@@ -96,10 +96,10 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 	testCases := []struct {
 		name   string
 		userID uuid.UUID
-		action string
+		side   string
 	}{
-		{name: "nil user id", userID: uuid.Nil, action: entity.BuySide},
-		{name: "invalid action", userID: validUUID, action: "gibberish"},
+		{name: "nil user id", userID: uuid.Nil, side: entity.BuySide},
+		{name: "invalid side", userID: validUUID, side: "gibberish"},
 	}
 
 	for _, tc := range testCases {
@@ -119,7 +119,7 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 			_, err := uc.Execute(t.Context(), createorder.Input{
 				UserID:          tc.userID,
 				MarketPairID:    validMarketPairID,
-				Action:          tc.action,
+				Side:            tc.side,
 				QuantityOrdered: validQuantityDecimal,
 				PricePerUnit:    validPriceDecimal,
 			})
@@ -146,7 +146,7 @@ func TestUseCase_Execute_PairDoesNotExist(t *testing.T) {
 	_, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
-		Action:          entity.BuySide,
+		Side:            entity.BuySide,
 		QuantityOrdered: validQuantityDecimal,
 		PricePerUnit:    validPriceDecimal,
 	})

@@ -146,7 +146,7 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 	_, err = deps.CreateOrder.Execute(c, createorder.Input{
 		UserID:          userUD,
 		MarketPairID:    req.MarketPairID,
-		Action:          req.Action,
+		Side:            req.Side,
 		QuantityOrdered: req.QuantityOrdered,
 		PricePerUnit:    req.PricePerUnit,
 	})
