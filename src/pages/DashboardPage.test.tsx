@@ -314,3 +314,126 @@ describe('DashboardPage open orders', () => {
     expect(within(section).queryByRole('table')).toBeNull();
   });
 });
+
+describe('DashboardPage create order', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const mockOrderBackend = (createResponse: Response) =>
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
+      if (url === `${host}/api/orders`) {
+        return createResponse;
+      }
+      return jsonResponse(balanceResponses[Number(url.split('/').pop())]);
+    });
+
+  const openDialog = async () => {
+    await screen.findByText('8.00');
+    fireEvent.click(screen.getByRole('button', { name: /create order/i }));
+    return screen.getByRole('dialog', { name: /create order/i });
+  };
+
+  it('labels quantity and price against the base, validates them and posts the order', async () => {
+    const fetchSpy = mockOrderBackend(jsonResponse({}));
+
+    render(<DashboardPage />);
+    const dialog = await openDialog();
+
+    const quantity = within(dialog).getByLabelText('Quantity (USD)');
+    const price = within(dialog).getByLabelText('Price (KCN per 1 USD)');
+    const submit = within(dialog).getByRole('button', { name: /place buy order/i });
+    expect(within(dialog).getByText('Up to 2 decimal places · lot size 1.00 USD')).toBeTruthy();
+    expect(within(dialog).getByText('Whole numbers only · tick 1 KCN')).toBeTruthy();
+    expect(submit).toHaveProperty('disabled', true);
+
+    fireEvent.change(quantity, { target: { value: '1.234' } });
+    fireEvent.change(price, { target: { value: '100.5' } });
+    expect(quantity.getAttribute('aria-invalid')).toBe('true');
+    expect(within(dialog).getByText('USD allows at most 2 decimal places')).toBeTruthy();
+    expect(within(dialog).getByText('Price accepts whole numbers only')).toBeTruthy();
+    expect(submit).toHaveProperty('disabled', true);
+
+    fireEvent.change(quantity, { target: { value: '1.5' } });
+    fireEvent.change(price, { target: { value: '100' } });
+    fireEvent.click(within(dialog).getByLabelText('Sell USD'));
+    expect(within(dialog).getByText('Sell 1.5 USD at 100 KCN per USD')).toBeTruthy();
+
+    const ordersCallsBefore = fetchSpy.mock.calls.filter(([url]) => url === ordersUrl).length;
+    fireEvent.click(within(dialog).getByRole('button', { name: /place sell order/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(fetchSpy).toHaveBeenCalledWith(`${host}/api/orders`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        market_pair_id: 1,
+        side: 'sell',
+        quantity_ordered: '1.5',
+        price_per_unit: '100',
+      }),
+    });
+    await waitFor(() =>
+      expect(fetchSpy.mock.calls.filter(([url]) => url === ordersUrl).length).toBeGreaterThan(
+        ordersCallsBefore,
+      ),
+    );
+  });
+
+  it('uses the chosen pair for labels, precision and the request', async () => {
+    const fetchSpy = mockOrderBackend(jsonResponse({}));
+
+    render(<DashboardPage />);
+    const dialog = await openDialog();
+
+    fireEvent.change(within(dialog).getByLabelText('Pair'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('Quantity (EUR)'), {
+      target: { value: '2.25' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Price (KCN per 1 EUR)'), {
+      target: { value: '4.5' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /place buy order/i }));
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${host}/api/orders`,
+        expect.objectContaining({
+          body: JSON.stringify({
+            market_pair_id: 2,
+            side: 'buy',
+            quantity_ordered: '2.25',
+            price_per_unit: '4.5',
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('keeps the dialog open and shows the error when the order is rejected', async () => {
+    mockOrderBackend({ ok: false, status: 422 } as Response);
+
+    render(<DashboardPage />);
+    const dialog = await openDialog();
+
+    fireEvent.change(within(dialog).getByLabelText('Quantity (USD)'), { target: { value: '1' } });
+    fireEvent.change(within(dialog).getByLabelText('Price (KCN per 1 USD)'), {
+      target: { value: '100' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /place buy order/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Order request failed with status 422',
+    );
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});

@@ -7,6 +7,7 @@ import {
   type PairBalance,
 } from '../lib/market';
 import { fetchOrders, formatOrderTime, type Order } from '../lib/orders';
+import CreateOrderDialog from '../components/CreateOrderDialog';
 import DepositDialog from '../components/DepositDialog';
 import { getStoredEmail } from '../lib/session';
 import { readPollIntervalMs, usePolling, type PollFetcher } from '../lib/usePolling';
@@ -47,8 +48,6 @@ const ordersPollIntervalMs = readPollIntervalMs(import.meta.env.VITE_ORDERS_POLL
 const openOrderStatuses = ['open', 'partially_filled'];
 
 const fetchOpenOrders: PollFetcher<Order[]> = (signal) => fetchOrders(openOrderStatuses, signal);
-
-const orderMenuOptions = ['Market order', 'Limit order'];
 
 function formatAmount(amount: number) {
   return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -93,7 +92,7 @@ function PlusIcon() {
 export default function DashboardPage() {
   const email = getStoredEmail() ?? 'Unknown user';
   const initial = email.charAt(0).toUpperCase() || '?';
-  const [isOrderMenuOpen, setIsOrderMenuOpen] = useState(false);
+  const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [pairs, setPairs] = useState<MarketPair[]>([]);
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
   const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
@@ -117,7 +116,10 @@ export default function DashboardPage() {
     fetchSelectedPairBalance,
     balancePollIntervalMs,
   );
-  const { data: openOrders } = usePolling(fetchOpenOrders, ordersPollIntervalMs);
+  const { data: openOrders, refresh: refreshOrders } = usePolling(
+    fetchOpenOrders,
+    ordersPollIntervalMs,
+  );
 
   const pairLabels = new Map(pairs.map((pair) => [pair.id, formatPairLabel(pair)]));
   const stats: Stat[] = [
@@ -301,22 +303,12 @@ export default function DashboardPage() {
           <button
             type="button"
             className="primary-action create-order-trigger"
-            onClick={() => setIsOrderMenuOpen((open) => !open)}
-            aria-expanded={isOrderMenuOpen}
+            onClick={() => setIsCreateOrderOpen(true)}
+            disabled={pairs.length === 0}
           >
             <PlusIcon />
             Create order
           </button>
-
-          {isOrderMenuOpen ? (
-            <div className="create-order-menu" role="menu">
-              {orderMenuOptions.map((option) => (
-                <button type="button" key={option} role="menuitem" onClick={() => setIsOrderMenuOpen(false)}>
-                  {option}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </section>
 
         <section className="panel panel-history" aria-labelledby="trade-history-title">
@@ -357,6 +349,19 @@ export default function DashboardPage() {
           symbols={selectedPair.symbols}
           onClose={() => setIsDepositOpen(false)}
           onDeposited={refreshBalance}
+        />
+      ) : null}
+
+      {isCreateOrderOpen ? (
+        <CreateOrderDialog
+          pairs={pairs}
+          initialPairId={selectedPairId}
+          onClose={() => setIsCreateOrderOpen(false)}
+          onCreated={() => {
+            // A new order reserves funds, so both the order list and the balance change.
+            refreshOrders();
+            refreshBalance();
+          }}
         />
       ) : null}
     </main>

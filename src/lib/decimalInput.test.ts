@@ -23,7 +23,7 @@ describe('validateDecimalInput', () => {
   });
 
   it('rejects zero in any form', () => {
-    expect(validateDecimalInput('0', 2, 'USD')).toBe('Amount must be greater than 0');
-    expect(validateDecimalInput('0.00', 2, 'USD')).toBe('Amount must be greater than 0');
+    expect(validateDecimalInput('0', 2, 'USD')).toBe('Must be greater than 0');
+    expect(validateDecimalInput('0.00', 2, 'USD')).toBe('Must be greater than 0');
   });
 });

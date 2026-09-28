@@ -19,8 +19,15 @@ export function validateDecimalInput(
   }
 
   if (!/[1-9]/.test(value)) {
-    return 'Amount must be greater than 0';
+    return 'Must be greater than 0';
   }
 
   return null;
+}
+
+export function decimalsHint(precision: number) {
+  if (precision === 0) {
+    return 'Whole numbers only';
+  }
+  return `Up to ${precision} decimal place${precision === 1 ? '' : 's'}`;
 }
