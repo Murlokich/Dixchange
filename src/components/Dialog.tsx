@@ -5,18 +5,19 @@ type DialogProps = {
   titleId: string;
   className?: string;
   // While busy (e.g. a request in flight) the dialog cannot be dismissed.
-  isBusy: boolean;
+  isBusy?: boolean;
   onClose: () => void;
-  onSubmit: () => void;
+  // When given, the dialog is a form submitted by its submit button; otherwise a plain window.
+  onSubmit?: () => void;
   children: ReactNode;
 };
 
-// Modal form shell: closes on Escape, backdrop click or the caller's Cancel button.
+// Modal shell: closes on Escape, backdrop click or the caller's Cancel/Close button.
 export default function Dialog({
   title,
   titleId,
   className,
-  isBusy,
+  isBusy = false,
   onClose,
   onSubmit,
   children,
@@ -32,6 +33,19 @@ export default function Dialog({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isBusy, onClose]);
 
+  const dialogProps = {
+    className: `dialog ${className ?? ''}`,
+    role: 'dialog',
+    'aria-modal': true,
+    'aria-labelledby': titleId,
+  };
+  const content = (
+    <>
+      <h2 id={titleId}>{title}</h2>
+      {children}
+    </>
+  );
+
   return (
     <div
       className="dialog-backdrop"
@@ -41,19 +55,19 @@ export default function Dialog({
         }
       }}
     >
-      <form
-        className={`dialog ${className ?? ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <h2 id={titleId}>{title}</h2>
-        {children}
-      </form>
+      {onSubmit ? (
+        <form
+          {...dialogProps}
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          {content}
+        </form>
+      ) : (
+        <div {...dialogProps}>{content}</div>
+      )}
     </div>
   );
 }

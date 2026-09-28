@@ -692,6 +692,67 @@ h1 {
   margin-bottom: 14px;
 }
 
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-header h2 {
+  margin: 0;
+}
+
+.panel-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panel-link:hover {
+  text-decoration: underline;
+}
+
+.dialog-wide {
+  width: min(100%, 1040px);
+  max-height: calc(100vh - 32px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.dialog-scroll {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dialog-wide .dialog-actions {
+  justify-content: flex-end;
+}
+
+.dialog-wide .dialog-actions .secondary-action {
+  width: auto;
+  padding: 0 24px;
+}
+
+.load-more {
+  justify-self: center;
+  width: auto;
+  padding: 0 28px;
+}
+
+.load-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+  transform: none;
+}
+
 .orders-table,
 .history-table {
   width: 100%;

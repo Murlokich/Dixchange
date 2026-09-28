@@ -88,6 +88,24 @@ const ordersResponse = {
   ],
 };
 
+const tradesUrl = `${host}/api/trades`;
+
+const makeTrade = (id: string, amount: string) => ({
+  id,
+  pair_id: 1,
+  order_id: `order-${id}`,
+  side: 'buy',
+  amount,
+  price: '3',
+  total: '36',
+  executed_at: '2026-09-28T19:39:56Z',
+});
+
+const tradesResponse = {
+  trades: [makeTrade('t1', '12.00'), { ...makeTrade('t2', '13.00'), pair_id: 2, side: 'sell' }],
+  next_cursor: 'cursor-1',
+};
+
 const mockBackend = (balances: Record<number, unknown>, orders: unknown = ordersResponse) =>
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = String(input);
@@ -96,6 +114,9 @@ const mockBackend = (balances: Record<number, unknown>, orders: unknown = orders
     }
     if (url === ordersUrl) {
       return jsonResponse(orders);
+    }
+    if (url === tradesUrl) {
+      return jsonResponse(tradesResponse);
     }
     return jsonResponse(balances[Number(url.split('/').pop())]);
   });
@@ -153,6 +174,9 @@ describe('DashboardPage pair selector', () => {
       if (String(input) === ordersUrl) {
         return jsonResponse(ordersResponse);
       }
+      if (String(input) === tradesUrl) {
+        return jsonResponse(tradesResponse);
+      }
       call += 1;
       return jsonResponse({
         pair_id: 1,
@@ -189,6 +213,9 @@ describe('DashboardPage deposit', () => {
       }
       if (url === ordersUrl) {
         return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
       }
       if (url === `${host}/api/balance/deposit`) {
         return jsonResponse({});
@@ -247,6 +274,9 @@ describe('DashboardPage deposit', () => {
       }
       if (url === ordersUrl) {
         return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
       }
       if (url === `${host}/api/balance/deposit`) {
         return { ok: false, status: 400 } as Response;
@@ -328,6 +358,9 @@ describe('DashboardPage create order', () => {
       }
       if (url === ordersUrl) {
         return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
       }
       if (url === `${host}/api/orders`) {
         return createResponse;
@@ -435,5 +468,115 @@ describe('DashboardPage create order', () => {
       'Order request failed with status 422',
     );
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('DashboardPage trade history', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows the latest trades in the dashboard widget', async () => {
+    const fetchSpy = mockBackend(balanceResponses);
+
+    render(<DashboardPage />);
+
+    const section = screen.getByRole('region', { name: /trade history/i });
+    const table = await within(section).findByRole('table');
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText('USD/KCN')).toBeTruthy();
+    expect(rows[0].textContent).toContain('12.00');
+    expect(within(rows[1]).getByText('EUR/KCN')).toBeTruthy();
+    expect(within(rows[1]).getByText('sell').className).toBe('side-sell');
+    expect(fetchSpy).toHaveBeenCalledWith(tradesUrl, expect.anything());
+  });
+
+  it('pages through the full history with load more and drops duplicates', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
+      }
+      if (url === `${tradesUrl}?cursor=cursor-1`) {
+        // Overlaps the first page by one trade, which must not be shown twice.
+        return jsonResponse({
+          trades: [makeTrade('t2', '13.00'), makeTrade('t3', '14.00')],
+          next_cursor: 'cursor-2',
+        });
+      }
+      if (url === `${tradesUrl}?cursor=cursor-2`) {
+        return jsonResponse({ trades: [makeTrade('t4', '15.00')], next_cursor: null });
+      }
+      return jsonResponse(balanceResponses[1]);
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('8.00');
+
+    fireEvent.click(screen.getByRole('button', { name: /view all/i }));
+    const dialog = screen.getByRole('dialog', { name: /trade history/i });
+
+    await within(dialog).findByText('12.00');
+    fireEvent.click(within(dialog).getByRole('button', { name: /load more/i }));
+    await within(dialog).findByText('14.00');
+    expect(within(dialog).getAllByText('13.00')).toHaveLength(1);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /load more/i }));
+    await within(dialog).findByText('15.00');
+    expect(within(within(dialog).getByRole('table')).getAllByRole('row')).toHaveLength(5);
+    expect(within(dialog).queryByRole('button', { name: /load more/i })).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledWith(`${tradesUrl}?cursor=cursor-2`, expect.anything());
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /close/i }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps loaded trades and offers a retry when a page fails', async () => {
+    let failNextPage = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
+      }
+      if (url === `${tradesUrl}?cursor=cursor-1`) {
+        if (failNextPage) {
+          failNextPage = false;
+          return { ok: false, status: 500 } as Response;
+        }
+        return jsonResponse({ trades: [makeTrade('t3', '14.00')], next_cursor: null });
+      }
+      return jsonResponse(balanceResponses[1]);
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('8.00');
+
+    fireEvent.click(screen.getByRole('button', { name: /view all/i }));
+    const dialog = screen.getByRole('dialog', { name: /trade history/i });
+    await within(dialog).findByText('12.00');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /load more/i }));
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Trades request failed with status 500',
+    );
+    expect(within(dialog).getByText('12.00')).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /retry/i }));
+    await within(dialog).findByText('14.00');
+    expect(within(dialog).queryByRole('alert')).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation
 - The app reads `VITE_BACKEND_HOST` from that file and uses it for the sign-up POST request.
 - `VITE_BALANCE_POLL_INTERVAL_MS` sets how often the dashboard refreshes balances (default 5000, minimum 1000).
 - `VITE_ORDERS_POLL_INTERVAL_MS` sets how often the dashboard refreshes open orders (default 5000, minimum 1000).
+- `VITE_TRADES_POLL_INTERVAL_MS` sets how often the dashboard refreshes the latest trades (default 5000, minimum 1000).
 
 ## Current screen
 

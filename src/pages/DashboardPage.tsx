@@ -9,18 +9,11 @@ import {
 import { fetchOrders, formatOrderTime, type Order } from '../lib/orders';
 import CreateOrderDialog from '../components/CreateOrderDialog';
 import DepositDialog from '../components/DepositDialog';
+import TradeHistoryDialog from '../components/TradeHistoryDialog';
+import TradesTable from '../components/TradesTable';
 import { getStoredEmail } from '../lib/session';
+import { fetchTrades, type Trade } from '../lib/trades';
 import { readPollIntervalMs, usePolling, type PollFetcher } from '../lib/usePolling';
-
-type Trade = {
-  id: string;
-  pair: string;
-  side: 'buy' | 'sell';
-  amount: number;
-  price: number;
-  total: number;
-  executedAt: string;
-};
 
 type Stat = {
   label: string;
@@ -28,30 +21,16 @@ type Stat = {
   tone?: 'positive' | 'negative';
 };
 
-const tradeHistory: Trade[] = [
-  { id: 'TRD-9231', pair: 'KCN/USD', side: 'buy', amount: 200, price: 4.7, total: 940, executedAt: '2026-08-03 14:22' },
-  { id: 'TRD-9214', pair: 'KCN/USD', side: 'sell', amount: 60, price: 5.05, total: 303, executedAt: '2026-08-02 09:47' },
-  {
-    id: 'TRD-9188',
-    pair: 'KCN/USD',
-    side: 'buy',
-    amount: 400,
-    price: 4.55,
-    total: 1820,
-    executedAt: '2026-07-30 18:03',
-  },
-];
-
 const balancePollIntervalMs = readPollIntervalMs(import.meta.env.VITE_BALANCE_POLL_INTERVAL_MS);
 const ordersPollIntervalMs = readPollIntervalMs(import.meta.env.VITE_ORDERS_POLL_INTERVAL_MS);
+const tradesPollIntervalMs = readPollIntervalMs(import.meta.env.VITE_TRADES_POLL_INTERVAL_MS);
 
 const openOrderStatuses = ['open', 'partially_filled'];
 
 const fetchOpenOrders: PollFetcher<Order[]> = (signal) => fetchOrders(openOrderStatuses, signal);
-
-function formatAmount(amount: number) {
-  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+// The dashboard widget shows only the newest page; older trades live in the trade history dialog.
+const fetchLatestTrades: PollFetcher<Trade[]> = async (signal) =>
+  (await fetchTrades(null, signal)).items;
 
 function ChevronIcon() {
   return (
@@ -93,6 +72,7 @@ export default function DashboardPage() {
   const email = getStoredEmail() ?? 'Unknown user';
   const initial = email.charAt(0).toUpperCase() || '?';
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [isTradeHistoryOpen, setIsTradeHistoryOpen] = useState(false);
   const [pairs, setPairs] = useState<MarketPair[]>([]);
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null);
   const [isPairMenuOpen, setIsPairMenuOpen] = useState(false);
@@ -119,6 +99,10 @@ export default function DashboardPage() {
   const { data: openOrders, refresh: refreshOrders } = usePolling(
     fetchOpenOrders,
     ordersPollIntervalMs,
+  );
+  const { data: latestTrades, refresh: refreshTrades } = usePolling(
+    fetchLatestTrades,
+    tradesPollIntervalMs,
   );
 
   const pairLabels = new Map(pairs.map((pair) => [pair.id, formatPairLabel(pair)]));
@@ -312,34 +296,18 @@ export default function DashboardPage() {
         </section>
 
         <section className="panel panel-history" aria-labelledby="trade-history-title">
-          <h2 id="trade-history-title">Trade history</h2>
-          {tradeHistory.length === 0 ? (
+          <div className="panel-header">
+            <h2 id="trade-history-title">Trade history</h2>
+            <button type="button" className="panel-link" onClick={() => setIsTradeHistoryOpen(true)}>
+              View all
+            </button>
+          </div>
+          {latestTrades === null ? (
+            <p className="empty-state">Loading trades…</p>
+          ) : latestTrades.length === 0 ? (
             <p className="empty-state">No trades yet.</p>
           ) : (
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>Pair</th>
-                  <th>Side</th>
-                  <th>Amount</th>
-                  <th>Price</th>
-                  <th>Total</th>
-                  <th>Executed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tradeHistory.map((trade) => (
-                  <tr key={trade.id}>
-                    <td>{trade.pair}</td>
-                    <td className={trade.side === 'buy' ? 'side-buy' : 'side-sell'}>{trade.side}</td>
-                    <td>{formatAmount(trade.amount)}</td>
-                    <td>{formatAmount(trade.price)}</td>
-                    <td>{formatAmount(trade.total)}</td>
-                    <td>{trade.executedAt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <TradesTable trades={latestTrades} pairLabels={pairLabels} />
           )}
         </section>
       </div>
@@ -352,15 +320,20 @@ export default function DashboardPage() {
         />
       ) : null}
 
+      {isTradeHistoryOpen ? (
+        <TradeHistoryDialog pairLabels={pairLabels} onClose={() => setIsTradeHistoryOpen(false)} />
+      ) : null}
+
       {isCreateOrderOpen ? (
         <CreateOrderDialog
           pairs={pairs}
           initialPairId={selectedPairId}
           onClose={() => setIsCreateOrderOpen(false)}
           onCreated={() => {
-            // A new order reserves funds, so both the order list and the balance change.
+            // A new order reserves funds and may match immediately, so all three can change.
             refreshOrders();
             refreshBalance();
+            refreshTrades();
           }}
         />
       ) : null}
