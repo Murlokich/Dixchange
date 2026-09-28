@@ -1,10 +1,10 @@
 package orderbook
 
-import "github.com/google/uuid"
+import "github.com/dixchange/Monolith/internal/domain/entity"
 
 type Trade struct {
-	AskOrderID uuid.UUID
-	BidOrderID uuid.UUID
-	Price      int64
-	Quantity   int64
+	Ask      entity.TradeParty
+	Bid      entity.TradeParty
+	Price    int64
+	Quantity int64
 }

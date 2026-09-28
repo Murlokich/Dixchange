@@ -14,11 +14,21 @@ import (
 	api "github.com/dixchange/Monolith/internal/controller/http"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
+	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
+	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
+	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
 	"github.com/dixchange/Monolith/internal/market/service"
+	bookwriter "github.com/dixchange/Monolith/internal/matching_engine/book_writer"
+	"github.com/dixchange/Monolith/internal/matching_engine/engine"
+	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
+	tradeSQL "github.com/dixchange/Monolith/internal/trade/adapter/sql"
+	tradeservice "github.com/dixchange/Monolith/internal/trade/service"
+	tradewriter "github.com/dixchange/Monolith/internal/trade/trade_writer"
 	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
 
@@ -36,6 +46,8 @@ import (
 
 const (
 	gracefulShutdownTime = 5 * time.Second
+	// TODO: run a book per market pair instead of a single hardcoded one.
+	defaultMarketPairID = 1
 )
 
 func runMigrations(dbConfig *config.DBConfig) error {
@@ -89,6 +101,10 @@ func main() {
 		log.Errorf("process config: %v", err)
 		return
 	}
+	if err := cfg.Validate(); err != nil {
+		log.Errorf("validate config: %v", err)
+		return
+	}
 
 	if err := runMigrations(&cfg.DBConfig); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		log.Errorf("run migrations: %v", err)
@@ -106,24 +122,55 @@ func main() {
 	balanceRepo := walletSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketRepo := marketSQL.NewRepository(postgresPool, pkg.GetDB)
 	orderRepo := orderSQL.NewRepository(postgresPool, pkg.GetDB)
+	tradeRepo := tradeSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketCache, err := service.NewDBCache(ctx, marketRepo)
 	if err != nil {
 		log.Errorf("create market db cache: %v", err)
 		return
 	}
-	pwdHasher := argon2.NewArgon2(&cfg.AuthConfig.Argon2Config)
+	pwdHasher := argon2.NewArgon2(&cfg.Argon2Config)
 	txManager := pkg.NewTXManager(postgresPool)
-	jwtManager, err := jwt.NewManager(&cfg.AuthConfig.JWTConfig)
+	jwtManager, err := jwt.NewManager(&cfg.JWTConfig)
 	if err != nil {
 		log.Errorf("create jwt manager: %v", err)
 		return
 	}
 	converter := service.NewConverter()
+	defaultPair, ok := marketCache.GetPair(defaultMarketPairID)
+	if !ok {
+		log.Errorf("market cache pair %d doesn't exist", defaultMarketPairID)
+		return
+	}
+	orderBook := orderbook.NewBook(&cfg.OrderBookConfig, defaultPair)
+	bookWriter := bookwriter.NewBookWriter(&cfg.BookWriterConfig)
+	tradeWriter := tradewriter.NewTradeWriter(&cfg.TradeWriterConfig)
+
+	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, tradeWriter, log)
+	tradeService := tradeservice.NewTradeService(
+		tradeWriter,
+		tradeRepo,
+		orderRepo,
+		balanceRepo,
+		txManager,
+		log,
+	)
+
+	// Start matching engine and trade service before any traffic comes in
+	go func() {
+		matchingEngine.Run(ctx)
+	}()
+	go func() {
+		tradeService.Run(ctx)
+	}()
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache, converter)
-	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter, bookWriter)
+	getMarketDataUseCase := getmarketdata.NewUseCase(marketCache)
+	getPairBalanceUseCase := getpairbalance.NewUseCase(balanceRepo, marketCache)
+	getOrdersUseCase := getorders.NewUseCase(orderRepo, marketCache)
+	getTradesUseCase := gettrades.NewUseCase(tradeRepo, marketCache, cfg.TradeHistory.PageSize)
 
 	deps := api.Dependencies{
 		Logger:         log,
@@ -132,6 +179,10 @@ func main() {
 		Login:          logUseCase,
 		Deposit:        depositUseCase,
 		CreateOrder:    createOrderUseCase,
+		GetMarketData:  getMarketDataUseCase,
+		GetPairBalance: getPairBalanceUseCase,
+		GetOrders:      getOrdersUseCase,
+		GetTrades:      getTradesUseCase,
 	}
 
 	router := gin.Default()

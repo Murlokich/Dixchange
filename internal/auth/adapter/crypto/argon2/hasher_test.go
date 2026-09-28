@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
-	"github.com/dixchange/Monolith/internal/auth/config"
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/stretchr/testify/require"
 	cryptoargon2 "golang.org/x/crypto/argon2"
 )

@@ -13,7 +13,7 @@ import (
 type Input struct {
 	UserID          uuid.UUID
 	MarketPairID    int
-	Action          string
+	Side            string
 	QuantityOrdered decimal.Decimal
 	PricePerUnit    decimal.Decimal
 }
@@ -27,9 +27,9 @@ func (i *Input) Validate(ctx context.Context) error {
 	}
 	if err := validation.ValidateWithContext(
 		ctx,
-		i.Action,
-		validation.Required.Error("status cannot be blank"),
-		validation.In(entity.BuyAction, entity.SellAction).Error("is not valid status"),
+		i.Side,
+		validation.Required.Error("side cannot be blank"),
+		validation.In(entity.BuySide, entity.SellSide).Error("is not valid side"),
 	); err != nil {
 		return entity.ValidationError{Err: err}
 	}

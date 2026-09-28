@@ -1,0 +1,8 @@
+BEGIN;
+
+ALTER TABLE trade.trade
+    DROP COLUMN IF EXISTS buyer_id,
+    DROP COLUMN IF EXISTS seller_id,
+    DROP COLUMN IF EXISTS pair_id;
+
+COMMIT;

@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/google/btree"
 	"github.com/google/uuid"
@@ -21,9 +22,17 @@ type deletableNode struct {
 }
 
 type Book struct {
+	// A book matches a single market pair, so the pair is held once here instead of
+	// being repeated on every order and trade.
+	pair   entity.Pair
 	asks   *asks
 	bids   *bids
 	orders map[uuid.UUID]deletableNode // reverse lookup map to list nodes stored in price levels of asks/bids
+}
+
+// Pair returns the market pair this book matches.
+func (b *Book) Pair() entity.Pair {
+	return b.pair
 }
 
 // Matches the orders and forms the trades; If Order cannot be fully filled immediately
@@ -76,17 +85,18 @@ func (b *Book) CancelOrder(id uuid.UUID) (bool, error) {
 	return true, nil
 }
 
-func NewBook(b int) *Book {
+func NewBook(cfg *config.OrderBook, pair entity.Pair) *Book {
 	return &Book{
-		asks:   &asks{btree.NewG[PriceLevel](b, less)},
-		bids:   &bids{btree.NewG[PriceLevel](b, less)},
+		pair:   pair,
+		asks:   &asks{btree.NewG[PriceLevel](cfg.B, less)},
+		bids:   &bids{btree.NewG[PriceLevel](cfg.B, less)},
 		orders: make(map[uuid.UUID]deletableNode),
 	}
 }
 
 // returns pointer to the requested side.
 func (b *Book) sameSide(side string) bookSide {
-	if side == entity.BuyAction {
+	if side == entity.BuySide {
 		return b.bids
 	}
 	return b.asks
@@ -94,7 +104,7 @@ func (b *Book) sameSide(side string) bookSide {
 
 // returns pointer to the opposite of the requested side.
 func (b *Book) oppositeSide(side string) bookSide {
-	if side == entity.BuyAction {
+	if side == entity.BuySide {
 		return b.asks
 	}
 	return b.bids
@@ -105,7 +115,7 @@ func (b *Book) oppositeSide(side string) bookSide {
 func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 	var askOrder, bidOrder *Order
 	// determine which order is ask and bid
-	if restingOrder.Side == entity.BuyAction {
+	if restingOrder.Side == entity.BuySide {
 		askOrder, bidOrder = newOrder, restingOrder
 	} else {
 		askOrder, bidOrder = restingOrder, newOrder
@@ -120,10 +130,18 @@ func executeTrade(restingOrder *Order, newOrder *Order) (Trade, error) {
 		return Trade{}, errors.Wrap(err, "new order fill")
 	}
 	return Trade{
-		AskOrderID: askOrder.ID,
-		BidOrderID: bidOrder.ID,
-		Price:      restingOrder.Price,
-		Quantity:   tradeQuantity,
+		Ask: entity.TradeParty{
+			OrderID:    askOrder.ID,
+			UserID:     askOrder.UserID,
+			OrderPrice: askOrder.Price,
+		},
+		Bid: entity.TradeParty{
+			OrderID:    bidOrder.ID,
+			UserID:     bidOrder.UserID,
+			OrderPrice: bidOrder.Price,
+		},
+		Price:    restingOrder.Price,
+		Quantity: tradeQuantity,
 	}, nil
 }
 

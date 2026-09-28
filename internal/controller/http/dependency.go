@@ -6,6 +6,10 @@ import (
 
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
+	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
+	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
+	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	"github.com/dixchange/Monolith/pkg"
@@ -21,10 +25,14 @@ type Dependencies struct {
 	Logger         pkg.Logger
 	TokenValidator TokenValidator
 
-	Register    *register.UseCase
-	Login       *login.UseCase
-	Deposit     *deposit.UseCase
-	CreateOrder *createorder.UseCase
+	Register       *register.UseCase
+	Login          *login.UseCase
+	Deposit        *deposit.UseCase
+	CreateOrder    *createorder.UseCase
+	GetMarketData  *getmarketdata.UseCase
+	GetPairBalance *getpairbalance.UseCase
+	GetOrders      *getorders.UseCase
+	GetTrades      *gettrades.UseCase
 }
 
 func (d *Dependencies) WrapHandler(handler Handler) gin.HandlerFunc {

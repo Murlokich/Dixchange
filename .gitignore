@@ -33,3 +33,5 @@ go.work.sum
 
 # debug files
 cmd/__debug_bin*
+
+CLAUDE.md

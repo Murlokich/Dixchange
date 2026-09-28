@@ -12,7 +12,7 @@ import (
 )
 
 const createOrder = `-- name: CreateOrder :exec
-INSERT INTO "order"."order" (id, user_id, market_pair_id, action, quantity_ordered, price, status)
+INSERT INTO "order"."order" (id, user_id, market_pair_id, side, quantity_ordered, price, status)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
@@ -20,7 +20,7 @@ type CreateOrderParams struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID
 	MarketPairID    int32
-	Action          OrderAction
+	Side            OrderSide
 	QuantityOrdered int64
 	Price           int64
 	Status          string
@@ -31,10 +31,74 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 		arg.ID,
 		arg.UserID,
 		arg.MarketPairID,
-		arg.Action,
+		arg.Side,
 		arg.QuantityOrdered,
 		arg.Price,
 		arg.Status,
 	)
 	return err
+}
+
+const fillOrder = `-- name: FillOrder :execrows
+UPDATE "order"."order"
+SET quantity_filled = quantity_filled + $1::bigint,
+    status = CASE
+        WHEN quantity_filled + $1::bigint >= quantity_ordered THEN 'filled'
+        ELSE 'partially_filled'
+    END,
+    last_updated_at = NOW()
+WHERE id = $2
+`
+
+type FillOrderParams struct {
+	Quantity int64
+	OrderID  uuid.UUID
+}
+
+func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, fillOrder, arg.Quantity, arg.OrderID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getUserOrdersByStatuses = `-- name: GetUserOrdersByStatuses :many
+SELECT id, user_id, market_pair_id, side, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC
+`
+
+type GetUserOrdersByStatusesParams struct {
+	UserID  uuid.UUID
+	Column2 []string
+}
+
+func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrdersByStatusesParams) ([]OrderOrder, error) {
+	rows, err := q.db.Query(ctx, getUserOrdersByStatuses, arg.UserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrderOrder
+	for rows.Next() {
+		var i OrderOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MarketPairID,
+			&i.Side,
+			&i.QuantityOrdered,
+			&i.QuantityFilled,
+			&i.Price,
+			&i.Status,
+			&i.CreatedAt,
+			&i.LastUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

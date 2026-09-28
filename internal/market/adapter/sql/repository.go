@@ -39,8 +39,9 @@ func rowsToPairs(rows []GetPairsRow) []entity.Pair {
 				Code:      rows[i].QuoteCurrencyCode,
 				Precision: int(rows[i].QuotePrecision),
 			},
-			LotSize:   rows[i].LotSize,
-			PriceTick: rows[i].PriceTick,
+			LotSize:        rows[i].LotSize,
+			PriceTick:      rows[i].PriceTick,
+			PricePrecision: int(rows[i].PricePrecision),
 		}
 	}
 	return pairs

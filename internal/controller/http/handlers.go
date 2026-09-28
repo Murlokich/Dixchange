@@ -6,9 +6,13 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
+	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
+	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
+	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
 	"github.com/dixchange/Monolith/internal/domain/usecase/login"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/pkg/errors"
 )
@@ -21,6 +25,11 @@ const (
 	loginFailureResponse                   = "Login failed due to internal error"
 	createOrderFailureResponse             = "Order creation failed due to internal error"
 	createOrderInsufficientBalanceResponse = "Order creation faild due to insufficient balance"
+	getMarketDataFailureResponse           = "Market data retrieval failed due to internal error"
+	getPairBalanceFailureResponse          = "Pair balance retrieval failed due to internal error"
+	getPairBalanceNotFoundResponse         = "Balance not found"
+	getOrdersFailureResponse               = "Orders retrieval failed due to internal error"
+	getTradesFailureResponse               = "Trades retrieval failed due to internal error"
 
 	errorField = "error"
 
@@ -140,7 +149,7 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 	_, err = deps.CreateOrder.Execute(c, createorder.Input{
 		UserID:          userUD,
 		MarketPairID:    req.MarketPairID,
-		Action:          req.Action,
+		Side:            req.Side,
 		QuantityOrdered: req.QuantityOrdered,
 		PricePerUnit:    req.PricePerUnit,
 	})
@@ -160,4 +169,129 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 		return
 	}
 	c.Status(http.StatusCreated)
+}
+
+func getMarketDataHandler(c *gin.Context, deps *Dependencies) {
+	output, err := deps.GetMarketData.Execute(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getMarketDataFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newMarketDataResponse(output.Pairs))
+}
+
+func getPairBalanceHandler(c *gin.Context, deps *Dependencies) {
+	var req GetPairBalanceRequest
+
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	output, err := deps.GetPairBalance.Execute(c, getpairbalance.Input{
+		UserID: userID,
+		PairID: req.PairID,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		if errors.Is(err, entity.ErrBalanceNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{errorField: getPairBalanceNotFoundResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getPairBalanceFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newPairBalanceResponse(output.Pair, output.Base, output.Quote))
+}
+
+func getOrdersHandler(c *gin.Context, deps *Dependencies) {
+	var req GetOrdersRequest
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	output, err := deps.GetOrders.Execute(c, getorders.Input{
+		UserID:   userID,
+		Statuses: req.Statuses,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getOrdersFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newOrdersResponse(output.Orders))
+}
+
+func getTradesHandler(c *gin.Context, deps *Dependencies) {
+	var req GetTradesRequest
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+
+	var cursor *uuid.UUID
+	if req.Cursor != "" {
+		parsed, err := uuid.Parse(req.Cursor)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Errorf("parse trade cursor: %v", err)
+			return
+		}
+		cursor = &parsed
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	output, err := deps.GetTrades.Execute(c, gettrades.Input{
+		UserID: userID,
+		Cursor: cursor,
+	})
+	if err != nil {
+		if errors.As(err, &entity.ValidationError{}) {
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{errorField: getTradesFailureResponse})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, newTradesResponse(output))
 }

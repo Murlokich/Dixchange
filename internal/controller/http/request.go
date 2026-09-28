@@ -21,7 +21,21 @@ type DepositRequest struct {
 
 type CreateOrderRequest struct {
 	MarketPairID    int             `json:"market_pair_id" binding:"required,min=0"`
-	Action          string          `json:"action" binding:"required,oneof=buy sell"`
+	Side            string          `json:"side" binding:"required,oneof=buy sell"`
 	QuantityOrdered decimal.Decimal `json:"quantity_ordered"`
 	PricePerUnit    decimal.Decimal `json:"price_per_unit"`
+}
+
+type GetPairBalanceRequest struct {
+	PairID int `uri:"pair_id" binding:"required,min=0"`
+}
+
+type GetOrdersRequest struct {
+	// Statuses come comma separated, e.g. ?status=open,partially_filled
+	Statuses []string `form:"status" collection_format:"csv" binding:"required,dive,oneof=open partially_filled"`
+}
+
+type GetTradesRequest struct {
+	// Cursor is the next_cursor of the previous page; empty for the first page.
+	Cursor string `form:"cursor" binding:"omitempty,uuid"`
 }

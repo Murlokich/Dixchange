@@ -1,0 +1,6 @@
+BEGIN;
+
+DROP TABLE IF EXISTS trade.trade;
+DROP SCHEMA IF EXISTS trade;
+
+COMMIT;

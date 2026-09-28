@@ -19,7 +19,15 @@ func RegisterEndpoints(router *gin.Engine, d *Dependencies) {
 
 	balanceRouter := apiRouter.Group("balance")
 	balanceRouter.POST("/deposit", d.WrapHandler(authMiddleware), d.WrapHandler(depositHandler))
+	balanceRouter.GET("/:pair_id", d.WrapHandler(authMiddleware), d.WrapHandler(getPairBalanceHandler))
 
 	orderRouter := apiRouter.Group("orders")
 	orderRouter.POST("", d.WrapHandler(authMiddleware), d.WrapHandler(createOrderHandler))
+	orderRouter.GET("", d.WrapHandler(authMiddleware), d.WrapHandler(getOrdersHandler))
+
+	tradeRouter := apiRouter.Group("trades")
+	tradeRouter.GET("", d.WrapHandler(authMiddleware), d.WrapHandler(getTradesHandler))
+
+	marketRouter := apiRouter.Group("market")
+	marketRouter.GET("/pairs", d.WrapHandler(getMarketDataHandler))
 }

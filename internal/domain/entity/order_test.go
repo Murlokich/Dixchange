@@ -17,19 +17,19 @@ func TestOrder_GetDebitAsset(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		action    string
+		side      string
 		wantAsset entity.Symbol
 		wantErr   bool
 	}{
-		{name: "buy", action: entity.BuyAction, wantAsset: testPair.Quote},
-		{name: "sell", action: entity.SellAction, wantAsset: testPair.Base},
-		{name: "invalid action", action: "gibberish", wantErr: true},
+		{name: "buy", side: entity.BuySide, wantAsset: testPair.Quote},
+		{name: "sell", side: entity.SellSide, wantAsset: testPair.Base},
+		{name: "invalid side", side: "gibberish", wantErr: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{MarketPair: testPair, Action: tc.action}
+			order := entity.Order{MarketPair: testPair, Side: tc.side}
 			asset, err := order.GetDebitAsset()
 			if tc.wantErr {
 				require.Error(t, err)
@@ -41,35 +41,69 @@ func TestOrder_GetDebitAsset(t *testing.T) {
 	}
 }
 
-func TestOrder_GetDebitNumber(t *testing.T) {
+func TestOrder_GetDebitAmount(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name   string
-		action string
-		want   int64
+		name        string
+		order       entity.Order
+		want        int64
+		errContains string
 	}{
 		{
-			name:   "buy debits price times quantity (quote asset)",
-			action: entity.BuyAction,
-			want:   2000,
+			name: "buy debits notional in quote minor units: 0.00123 BTC at 65000.50 USDT",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Side:            entity.BuySide,
+				QuantityOrdered: 123000,
+				PricePerUnit:    6500050,
+			},
+			want: 7995061500,
 		},
 		{
-			name:   "sell debits quantity (base asset)",
-			action: entity.SellAction,
-			want:   20,
+			name: "buy debits notional in quote minor units: 1 USD at 1 KCN",
+			order: entity.Order{
+				MarketPair:      usdKcn,
+				Side:            entity.BuySide,
+				QuantityOrdered: 100,
+				PricePerUnit:    1,
+			},
+			want: 1,
+		},
+		{
+			name: "sell debits quantity in base minor units",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Side:            entity.SellSide,
+				QuantityOrdered: 123000,
+				PricePerUnit:    6500050,
+			},
+			want: 123000,
+		},
+		{
+			name: "buy propagates pair notional error",
+			order: entity.Order{
+				MarketPair:      usdKcn,
+				Side:            entity.BuySide,
+				QuantityOrdered: 1,
+				PricePerUnit:    1,
+			},
+			errContains: "market pair notional",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{
-				Action:          tc.action,
-				PricePerUnit:    100,
-				QuantityOrdered: 20,
+
+			amount, err := tc.order.GetDebitAmount()
+			if tc.errContains != "" {
+				require.ErrorContains(t, err, tc.errContains)
+				require.Zero(t, amount)
+				return
 			}
-			require.Equal(t, tc.want, order.GetDebitAmount())
+			require.NoError(t, err)
+			require.Equal(t, tc.want, amount)
 		})
 	}
 }
@@ -79,19 +113,19 @@ func TestOrder_GetCreditAsset(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		action    string
+		side      string
 		wantAsset entity.Symbol
 		wantErr   bool
 	}{
-		{name: "buy", action: entity.BuyAction, wantAsset: testPair.Base},
-		{name: "sell", action: entity.SellAction, wantAsset: testPair.Quote},
-		{name: "invalid action", action: "gibberish", wantErr: true},
+		{name: "buy", side: entity.BuySide, wantAsset: testPair.Base},
+		{name: "sell", side: entity.SellSide, wantAsset: testPair.Quote},
+		{name: "invalid side", side: "gibberish", wantErr: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			order := entity.Order{MarketPair: testPair, Action: tc.action}
+			order := entity.Order{MarketPair: testPair, Side: tc.side}
 			asset, err := order.GetCreditAsset()
 			if tc.wantErr {
 				require.Error(t, err)
@@ -99,6 +133,29 @@ func TestOrder_GetCreditAsset(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tc.wantAsset, asset)
+		})
+	}
+}
+
+func TestOrder_RemainingQuantity(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		filled int64
+		want   int64
+	}{
+		{name: "not filled", filled: 0, want: 300},
+		{name: "partially filled", filled: 100, want: 200},
+		{name: "fully filled", filled: 300, want: 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			order := entity.Order{QuantityOrdered: 300, QuantityFilled: tc.filled}
+			require.Equal(t, tc.want, order.RemainingQuantity())
 		})
 	}
 }
