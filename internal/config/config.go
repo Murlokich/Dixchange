@@ -7,14 +7,14 @@ import (
 )
 
 type Config struct {
-	HTTPConfig        HTTPConfig        `envconfig:"HTTP"`
-	DBConfig          DBConfig          `envconfig:"DB"`
-	Argon2Config      Argon2Config      `envconfig:"ARGON2"`
-	JWTConfig         JWTConfig         `envconfig:"JWT"`
-	BookWriterConfig  BookWriterConfig  `envconfig:"BOOK_WRITER"`
-	OrderBookConfig   OrderBook         `envconfig:"ORDER_BOOK"`
-	TradeWriterConfig TradeWriterConfig `envconfig:"TRADE_WRITER"`
-	TradeHistory      TradeHistory      `envconfig:"TRADE_HISTORY"`
+	HTTPConfig       HTTPConfig       `envconfig:"HTTP"`
+	DBConfig         DBConfig         `envconfig:"DB"`
+	Argon2Config     Argon2Config     `envconfig:"ARGON2"`
+	JWTConfig        JWTConfig        `envconfig:"JWT"`
+	CommandBusConfig CommandBusConfig `envconfig:"COMMAND_BUS"`
+	OrderBookConfig  OrderBook        `envconfig:"ORDER_BOOK"`
+	EventBusConfig   EventBusConfig   `envconfig:"EVENT_BUS"`
+	TradeHistory     TradeHistory     `envconfig:"TRADE_HISTORY"`
 }
 
 // Validate checks the values envconfig can't: those that parse fine but make no sense.
@@ -55,12 +55,12 @@ type OrderBook struct {
 	B int `default:"8"`
 }
 
-type BookWriterConfig struct {
-	BufferSize   int           `default:"100" split_words:"true"`
-	WriteTimeout time.Duration `default:"100ms" split_words:"true"`
+type CommandBusConfig struct {
+	BufferSize  int           `default:"100" split_words:"true"`
+	SendTimeout time.Duration `default:"100ms" split_words:"true"`
 }
 
-type TradeWriterConfig struct {
+type EventBusConfig struct {
 	BufferSize int `default:"100" split_words:"true"`
 }
 

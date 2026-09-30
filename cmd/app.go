@@ -12,6 +12,7 @@ import (
 	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
 	"github.com/dixchange/Monolith/internal/config"
 	api "github.com/dixchange/Monolith/internal/controller/http"
+	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
@@ -22,13 +23,13 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
 	marketSQL "github.com/dixchange/Monolith/internal/market/adapter/sql"
 	"github.com/dixchange/Monolith/internal/market/service"
-	bookwriter "github.com/dixchange/Monolith/internal/matching_engine/book_writer"
+	commandbus "github.com/dixchange/Monolith/internal/matching_engine/command_bus"
 	"github.com/dixchange/Monolith/internal/matching_engine/engine"
+	eventbus "github.com/dixchange/Monolith/internal/matching_engine/event_bus"
 	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	orderSQL "github.com/dixchange/Monolith/internal/order/adapter/sql"
 	tradeSQL "github.com/dixchange/Monolith/internal/trade/adapter/sql"
 	tradeservice "github.com/dixchange/Monolith/internal/trade/service"
-	tradewriter "github.com/dixchange/Monolith/internal/trade/trade_writer"
 	walletSQL "github.com/dixchange/Monolith/internal/wallet/adapter/sql"
 	"github.com/dixchange/Monolith/pkg"
 
@@ -142,31 +143,33 @@ func main() {
 		return
 	}
 	orderBook := orderbook.NewBook(&cfg.OrderBookConfig, defaultPair)
-	bookWriter := bookwriter.NewBookWriter(&cfg.BookWriterConfig)
-	tradeWriter := tradewriter.NewTradeWriter(&cfg.TradeWriterConfig)
+	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
+	eventBus := eventbus.NewEventBus(&cfg.EventBusConfig)
 
-	matchingEngine := engine.NewMatchingEngine(orderBook, bookWriter, tradeWriter, log)
-	tradeService := tradeservice.NewTradeService(
-		tradeWriter,
+	matchingEngine := engine.NewMatchingEngine(orderBook, commandBus, eventBus, log)
+	settlementService := tradeservice.NewSettlementService(
+		eventBus,
 		tradeRepo,
 		orderRepo,
 		balanceRepo,
+		marketCache,
 		txManager,
 		log,
 	)
 
-	// Start matching engine and trade service before any traffic comes in
+	// Start matching engine and settlement service before any traffic comes in
 	go func() {
 		matchingEngine.Run(ctx)
 	}()
 	go func() {
-		tradeService.Run(ctx)
+		settlementService.Run(ctx)
 	}()
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
 	depositUseCase := deposit.NewUseCase(balanceRepo, marketCache, converter)
-	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter, bookWriter)
+	createOrderUseCase := createorder.NewUseCase(orderRepo, balanceRepo, marketCache, txManager, converter, commandBus)
+	cancelOrderUseCase := cancelorder.NewUseCase(orderRepo, commandBus)
 	getMarketDataUseCase := getmarketdata.NewUseCase(marketCache)
 	getPairBalanceUseCase := getpairbalance.NewUseCase(balanceRepo, marketCache)
 	getOrdersUseCase := getorders.NewUseCase(orderRepo, marketCache)
@@ -179,6 +182,7 @@ func main() {
 		Login:          logUseCase,
 		Deposit:        depositUseCase,
 		CreateOrder:    createOrderUseCase,
+		CancelOrder:    cancelOrderUseCase,
 		GetMarketData:  getMarketDataUseCase,
 		GetPairBalance: getPairBalanceUseCase,
 		GetOrders:      getOrdersUseCase,

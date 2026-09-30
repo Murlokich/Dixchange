@@ -6,6 +6,7 @@ import (
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 )
 
@@ -84,21 +85,78 @@ func (r *Repository) GetUserOrdersByStatuses(
 
 	orders := make([]entity.Order, 0, len(rows))
 	for _, row := range rows {
-		orders = append(orders, entity.Order{
-			ID:              row.ID,
-			UserID:          row.UserID,
-			MarketPair:      entity.Pair{ID: int(row.MarketPairID)},
-			Side:            string(row.Side),
-			QuantityOrdered: row.QuantityOrdered,
-			QuantityFilled:  row.QuantityFilled,
-			PricePerUnit:    row.Price,
-			Status:          row.Status,
-			CreatedAt:       row.CreatedAt.Time,
-			// NULL last_updated_at means the order was never updated, so the zero time is right.
-			LastUpdatedAt: row.LastUpdatedAt.Time,
-		})
+		orders = append(orders, rowToOrder(row))
 	}
 	return orders, nil
+}
+
+// GetOrderCancelInfo returns what is needed to decide whether the order may be cancelled.
+// It returns entity.ErrOrderNotFound when there is no such order.
+func (r *Repository) GetOrderCancelInfo(ctx context.Context, orderID uuid.UUID) (entity.OrderCancelInfo, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	row, err := q.GetOrderCancelInfo(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.OrderCancelInfo{}, errors.Wrapf(entity.ErrOrderNotFound, "order %s", orderID)
+		}
+		return entity.OrderCancelInfo{}, errors.Wrap(err, "query get order cancel info")
+	}
+
+	return entity.OrderCancelInfo{UserID: row.UserID, Status: row.Status}, nil
+}
+
+// GetOrderForUpdate returns the order and locks its row until the end of the transaction,
+// so the order can't change between reading and updating it. It is meant to be called
+// within a transaction. The returned order carries only the market pair ID; the caller
+// resolves the rest of the pair.
+func (r *Repository) GetOrderForUpdate(ctx context.Context, orderID uuid.UUID) (entity.Order, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	row, err := q.GetOrderForUpdate(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.Order{}, errors.Wrapf(entity.ErrOrderNotFound, "order %s", orderID)
+		}
+		return entity.Order{}, errors.Wrap(err, "query get order for update")
+	}
+
+	return rowToOrder(row), nil
+}
+
+// CancelOrder marks the order cancelled. It doesn't check the current status: the caller
+// is expected to have checked it on the order locked by GetOrderForUpdate.
+func (r *Repository) CancelOrder(ctx context.Context, orderID uuid.UUID) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.CancelOrder(ctx, orderID)
+	if err != nil {
+		return errors.Wrap(err, "query cancel order")
+	}
+	if rows == noOrderAffected {
+		return errors.Errorf("order %s to cancel doesn't exist", orderID)
+	}
+
+	return nil
+}
+
+func rowToOrder(row OrderOrder) entity.Order {
+	return entity.Order{
+		ID:              row.ID,
+		UserID:          row.UserID,
+		MarketPair:      entity.Pair{ID: int(row.MarketPairID)},
+		Side:            string(row.Side),
+		QuantityOrdered: row.QuantityOrdered,
+		QuantityFilled:  row.QuantityFilled,
+		PricePerUnit:    row.Price,
+		Status:          row.Status,
+		CreatedAt:       row.CreatedAt.Time,
+		// NULL last_updated_at means the order was never updated, so the zero time is right.
+		LastUpdatedAt: row.LastUpdatedAt.Time,
+	}
 }
 
 func NewRepository(db DBTX, txGetter pkg.TXGetter) *Repository {

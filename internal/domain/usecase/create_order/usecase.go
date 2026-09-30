@@ -34,8 +34,8 @@ type Converter interface {
 	) (entity.Order, error)
 }
 
-type BookWriter interface {
-	InsertOrder(ctx context.Context, entityOrder entity.Order) error
+type CommandBus interface {
+	SendPlaceOrder(ctx context.Context, entityOrder entity.Order) error
 }
 
 type UseCase struct {
@@ -44,7 +44,7 @@ type UseCase struct {
 	marketRepo MarketRepository
 	txManager  TXManager
 	converter  Converter
-	bookWriter BookWriter
+	commandBus CommandBus
 }
 
 func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
@@ -62,7 +62,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "get debit asset")
 	}
 
-	debitAmount, err := order.GetDebitAmount()
+	debitAmount, err := order.GetDebitOrderedAmount()
 	if err != nil {
 		return Output{}, errors.Wrap(err, "get debit amount")
 	}
@@ -81,9 +81,12 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "tx manager with tx")
 	}
 
-	if err = u.bookWriter.InsertOrder(ctx, order); err != nil {
-		// TODO: cancel the order
-		return Output{}, errors.Wrap(err, "bookWriter insert order")
+	if err = u.commandBus.SendPlaceOrder(ctx, order); err != nil {
+		// TODO: the order is persisted with its funds reserved but never reached the book.
+		// The engine never had it, so cancel it here directly: run the same transaction as
+		// the settlement cancellation (status cancelled, release the remaining reservation)
+		// instead of going through the engine. An outbox would remove the gap entirely.
+		return Output{}, errors.Wrap(err, "command bus send place order")
 	}
 
 	return Output{}, nil
@@ -125,7 +128,7 @@ func NewUseCase(
 	marketRepo MarketRepository,
 	txManager TXManager,
 	converter Converter,
-	bookWriter BookWriter,
+	commandBus CommandBus,
 ) *UseCase {
 	return &UseCase{
 		orderRepo:  repo,
@@ -133,6 +136,6 @@ func NewUseCase(
 		marketRepo: marketRepo,
 		txManager:  txManager,
 		converter:  converter,
-		bookWriter: bookWriter,
+		commandBus: commandBus,
 	}
 }

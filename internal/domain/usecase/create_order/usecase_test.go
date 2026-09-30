@@ -20,7 +20,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	marketRepo := createorder.NewMockMarketRepository(t)
 	txManager := createorder.NewMockTXManager(t)
 	converter := createorder.NewMockConverter(t)
-	bookWriter := createorder.NewMockBookWriter(t)
+	commandBus := createorder.NewMockCommandBus(t)
 
 	pair := entity.Pair{
 		ID:             validMarketPairID,
@@ -65,8 +65,8 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 		Return(nil).
 		Once()
 
-	bookWriter.EXPECT().
-		InsertOrder(mock.Anything, mock.MatchedBy(matchesExpectedOrder)).
+	commandBus.EXPECT().
+		SendPlaceOrder(mock.Anything, mock.MatchedBy(matchesExpectedOrder)).
 		Return(nil).
 		Once()
 
@@ -77,7 +77,7 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 		}).
 		Once()
 
-	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, bookWriter)
+	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, commandBus)
 	output, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,
@@ -113,9 +113,9 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 			marketRepo := createorder.NewMockMarketRepository(t)
 			txManager := createorder.NewMockTXManager(t)
 			converter := createorder.NewMockConverter(t)
-			bookWriter := createorder.NewMockBookWriter(t)
+			commandBus := createorder.NewMockCommandBus(t)
 
-			uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, bookWriter)
+			uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, commandBus)
 			_, err := uc.Execute(t.Context(), createorder.Input{
 				UserID:          tc.userID,
 				MarketPairID:    validMarketPairID,
@@ -138,11 +138,11 @@ func TestUseCase_Execute_PairDoesNotExist(t *testing.T) {
 	marketRepo := createorder.NewMockMarketRepository(t)
 	txManager := createorder.NewMockTXManager(t)
 	converter := createorder.NewMockConverter(t)
-	bookWriter := createorder.NewMockBookWriter(t)
+	commandBus := createorder.NewMockCommandBus(t)
 
 	marketRepo.EXPECT().GetPair(validMarketPairID).Return(entity.Pair{}, false).Once()
 
-	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, bookWriter)
+	uc := createorder.NewUseCase(orderRepo, walletRepo, marketRepo, txManager, converter, commandBus)
 	_, err := uc.Execute(t.Context(), createorder.Input{
 		UserID:          validUUID,
 		MarketPairID:    validMarketPairID,

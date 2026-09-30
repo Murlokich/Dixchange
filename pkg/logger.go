@@ -4,6 +4,7 @@ import "github.com/sirupsen/logrus"
 
 type Logger interface {
 	Infof(string, ...any)
+	Warnf(string, ...any)
 	Error(args ...interface{})
 	Errorf(string, ...any)
 	WithField(string, interface{}) Logger

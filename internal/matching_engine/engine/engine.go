@@ -5,70 +5,116 @@ import (
 	"errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	commandbus "github.com/dixchange/Monolith/internal/matching_engine/command_bus"
 	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	"github.com/dixchange/Monolith/pkg"
+	"github.com/google/uuid"
+	pkgerrors "github.com/pkg/errors"
 )
 
 type OrderBook interface {
 	AddOrder(order *orderbook.Order) ([]orderbook.Trade, error)
+	CancelOrder(id uuid.UUID) (bool, error)
 	Pair() entity.Pair
 }
 
-type BookWriter interface {
-	RetrieveOrder(ctx context.Context) (orderbook.Order, error)
+type CommandBus interface {
+	Receive(ctx context.Context) (commandbus.Command, error)
 }
 
-type TradeWriter interface {
-	InsertTrades(ctx context.Context, trades []entity.Trade) error
+type EventBus interface {
+	PublishTrades(ctx context.Context, trades []entity.Trade) error
+	PublishOrderCancelled(ctx context.Context, orderID uuid.UUID) error
 }
 
 type MatchingEngine struct {
-	book        OrderBook
-	bookWriter  BookWriter
-	tradeWriter TradeWriter
-	logger      pkg.Logger
+	book       OrderBook
+	commandBus CommandBus
+	eventBus   EventBus
+	logger     pkg.Logger
 }
 
 func (m *MatchingEngine) Run(ctx context.Context) {
 	for {
-		order, err := m.bookWriter.RetrieveOrder(ctx)
+		command, err := m.commandBus.Receive(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				// TODO: graceful shutdown
 				return
 			}
-			m.logger.Errorf("bookWriter Retrieve order: %v", err)
+			m.logger.Errorf("commandBus Receive: %v", err)
 			continue
 		}
-		loggerWithOrderID := m.logger.WithField("order_id", order.ID)
 
-		trades, err := m.book.AddOrder(&order)
-		if err != nil {
-			loggerWithOrderID.Errorf("book add order: %v", err)
+		var orderID uuid.UUID
+		switch c := command.(type) {
+		case commandbus.PlaceOrder:
+			orderID = c.Order.ID
+			err = m.placeOrder(ctx, c.Order)
+		case commandbus.CancelOrder:
+			orderID = c.OrderID
+			err = m.cancelOrder(ctx, c.OrderID)
+		default:
+			m.logger.Errorf("unknown command type %T", command)
 			continue
 		}
-		entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
-		if err = m.tradeWriter.InsertTrades(ctx, entityTrades); err != nil {
+		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				// TODO: graceful shutdown
 				return
 			}
-			m.logger.Errorf("tradeWriter Insert Trades: %v", err)
+			m.logger.WithField("order_id", orderID).Errorf("handle %T: %v", command, err)
 		}
 	}
 }
 
+// placeOrder matches the order against the book and publishes the trades it produced.
+func (m *MatchingEngine) placeOrder(ctx context.Context, order orderbook.Order) error {
+	trades, err := m.book.AddOrder(&order)
+	if err != nil {
+		return pkgerrors.Wrap(err, "book add order")
+	}
+	entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
+	if err = m.eventBus.PublishTrades(ctx, entityTrades); err != nil {
+		return pkgerrors.Wrap(err, "eventBus PublishTrades")
+	}
+	return nil
+}
+
+// cancelOrder removes the order from the book and publishes the cancellation, so the
+// funds still reserved for it get released.
+func (m *MatchingEngine) cancelOrder(ctx context.Context, orderID uuid.UUID) error {
+	cancelled, err := m.book.CancelOrder(orderID)
+	if err != nil {
+		// TODO: an error here means the book's internal state is broken (a list node that
+		// isn't an order, a price level that can't be deleted), not a bad request. Decide
+		// whether the engine should halt instead of carrying on with a corrupted book.
+		return pkgerrors.Wrap(err, "book cancel order")
+	}
+	if !cancelled {
+		// Normal outcome: the order was filled, or already cancelled, before this command
+		// reached the engine. There is nothing to release, so nothing is published.
+		m.logger.WithField("order_id", orderID).Infof("order to cancel is not in the book")
+		return nil
+	}
+
+	if err = m.eventBus.PublishOrderCancelled(ctx, orderID); err != nil {
+		return pkgerrors.Wrap(err, "eventBus PublishOrderCancelled")
+	}
+	return nil
+}
+
 func NewMatchingEngine(
 	book OrderBook,
-	bookWriter BookWriter,
-	tradeWriter TradeWriter,
+	commandBus CommandBus,
+	eventBus EventBus,
 	logger pkg.Logger,
 ) *MatchingEngine {
 	return &MatchingEngine{
-		book:        book,
-		bookWriter:  bookWriter,
-		tradeWriter: tradeWriter,
-		logger:      logger,
+		book:       book,
+		commandBus: commandBus,
+		eventBus:   eventBus,
+		logger:     logger,
 	}
 }
 

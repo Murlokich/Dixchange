@@ -17,4 +17,7 @@ var (
 	ErrInsufficientBalance = errors.New("User has insufficient balance for the corresponding action")
 	ErrBalanceNotFound     = errors.New("No balance record was found for the user and symbol")
 	ErrNotTradeParticipant = errors.New("User is not a participant of the trade")
+	ErrOrderNotFound       = errors.New("No such order was found")
+	ErrOrderNotOwned       = errors.New("Order doesn't belong to the user")
+	ErrOrderNotCancellable = errors.New("Order is no longer active and can't be cancelled")
 )

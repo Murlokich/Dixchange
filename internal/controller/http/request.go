@@ -26,6 +26,10 @@ type CreateOrderRequest struct {
 	PricePerUnit    decimal.Decimal `json:"price_per_unit"`
 }
 
+type CancelOrderRequest struct {
+	OrderID string `uri:"id" binding:"required,uuid"`
+}
+
 type GetPairBalanceRequest struct {
 	PairID int `uri:"pair_id" binding:"required,min=0"`
 }
