@@ -7,6 +7,7 @@ import {
   type PairBalance,
 } from '../lib/market';
 import { fetchOrders, formatOrderTime, type Order } from '../lib/orders';
+import CancelOrderButton from '../components/CancelOrderButton';
 import CreateOrderDialog from '../components/CreateOrderDialog';
 import DepositDialog from '../components/DepositDialog';
 import TradeHistoryDialog from '../components/TradeHistoryDialog';
@@ -255,6 +256,7 @@ export default function DashboardPage() {
                   <th>Price</th>
                   <th>Remaining / Ordered</th>
                   <th>Created</th>
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -274,6 +276,16 @@ export default function DashboardPage() {
                       }
                     >
                       {formatOrderTime(order.created_at)}
+                    </td>
+                    <td className="order-actions">
+                      <CancelOrderButton
+                        order={order}
+                        onCancelled={() => {
+                          // Cancelling releases reserved funds, so the balance changes too.
+                          refreshOrders();
+                          refreshBalance();
+                        }}
+                      />
                     </td>
                   </tr>
                 ))}

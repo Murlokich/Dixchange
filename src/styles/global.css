@@ -787,6 +787,52 @@ h1 {
   color: #ffb3c1;
 }
 
+.orders-table td.order-actions {
+  text-align: right;
+  text-transform: none;
+}
+
+.cancel-order {
+  display: inline-grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.cancel-button {
+  padding: 4px 12px;
+  border: 1px solid rgba(137, 179, 255, 0.24);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cancel-button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: rgba(137, 179, 255, 0.45);
+}
+
+.cancel-button.confirming {
+  border-color: rgba(255, 107, 129, 0.8);
+  background: rgba(255, 107, 129, 0.12);
+  color: #ffb3c1;
+}
+
+.cancel-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.cancel-error {
+  max-width: 220px;
+  color: #ffb3c1;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
 .empty-state {
   color: var(--muted);
   font-size: 0.9rem;
