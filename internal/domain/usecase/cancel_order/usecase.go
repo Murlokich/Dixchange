@@ -10,10 +10,11 @@ import (
 
 type OrderRepository interface {
 	GetOrderCancelInfo(ctx context.Context, orderID uuid.UUID) (entity.OrderCancelInfo, error)
+	CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error
 }
 
 type CommandBus interface {
-	SendCancelOrder(ctx context.Context, orderID uuid.UUID) error
+	SendCancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error
 }
 
 type UseCase struct {
@@ -21,9 +22,9 @@ type UseCase struct {
 	commandBus CommandBus
 }
 
-// Execute sends the cancel request to the matching engine, which decides whether the
-// order is still there to cancel. Success means the request was accepted, not that the
-// order is cancelled.
+// Execute records the cancel request in the command log and sends it to the matching
+// engine, which decides whether the order is still there to cancel. Success means the
+// request was accepted, not that the order is cancelled.
 //
 // It returns entity.ErrOrderNotFound or entity.ErrOrderNotOwned for an order the user
 // can't cancel, and entity.ErrOrderNotCancellable for their own order that is no longer
@@ -45,7 +46,18 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrapf(entity.ErrOrderNotCancellable, "order %s status %s", input.OrderID, info.Status)
 	}
 
-	if err = u.commandBus.SendCancelOrder(ctx, input.OrderID); err != nil {
+	commandID, err := uuid.NewV7()
+	if err != nil {
+		return Output{}, errors.Wrap(err, "gen command id")
+	}
+	command := entity.NewCancelOrderCommand(commandID, input.OrderID)
+	if err = u.orderRepo.CreateOrderCommand(ctx, command); err != nil {
+		return Output{}, errors.Wrap(err, "order repo create order command")
+	}
+
+	if err = u.commandBus.SendCancelOrder(ctx, commandID, input.OrderID); err != nil {
+		// TODO(recovery): the command is in the command log but never reached the book.
+		// A reload of the engine from the orders and the command log would apply it.
 		return Output{}, errors.Wrap(err, "command bus send cancel order")
 	}
 

@@ -10,7 +10,7 @@ import (
 )
 
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, order entity.Order) error
+	CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error
 }
 
 type WalletRepository interface {
@@ -35,7 +35,7 @@ type Converter interface {
 }
 
 type CommandBus interface {
-	SendPlaceOrder(ctx context.Context, entityOrder entity.Order) error
+	SendPlaceOrder(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order) error
 }
 
 type UseCase struct {
@@ -67,12 +67,20 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "get debit amount")
 	}
 
+	// The order reaches the orders only once the engine has placed it: until then it is
+	// a place command in the command log, with its funds already reserved.
+	commandID, err := uuid.NewV7()
+	if err != nil {
+		return Output{}, errors.Wrap(err, "gen command id")
+	}
+	command := entity.NewPlaceOrderCommand(commandID, order)
+
 	fn := func(ctx context.Context) error {
 		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, debitAmount); err != nil {
 			return errors.Wrap(err, "wallet repo reserve funds")
 		}
-		if err = u.orderRepo.CreateOrder(ctx, order); err != nil {
-			return errors.Wrap(err, "repo create order")
+		if err = u.orderRepo.CreateOrderCommand(ctx, command); err != nil {
+			return errors.Wrap(err, "repo create order command")
 		}
 		return nil
 	}
@@ -81,11 +89,11 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "tx manager with tx")
 	}
 
-	if err = u.commandBus.SendPlaceOrder(ctx, order); err != nil {
-		// TODO: the order is persisted with its funds reserved but never reached the book.
-		// The engine never had it, so cancel it here directly: run the same transaction as
-		// the settlement cancellation (status cancelled, release the remaining reservation)
-		// instead of going through the engine. An outbox would remove the gap entirely.
+	if err = u.commandBus.SendPlaceOrder(ctx, commandID, order); err != nil {
+		// TODO(recovery): the command is in the command log with its funds reserved, but
+		// never reached the book. A reload of the engine from the orders and the command
+		// log would place it. See "Overload rejection happens after the commit" in
+		// CLAUDE.md for why this isn't compensated here.
 		return Output{}, errors.Wrap(err, "command bus send place order")
 	}
 

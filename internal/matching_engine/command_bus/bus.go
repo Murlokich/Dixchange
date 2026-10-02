@@ -12,17 +12,20 @@ import (
 
 // Command is a request to the matching engine, which may still reject it. Every command
 // for a book goes through one bus, so the engine sees them in a single order: a cancel
-// can't overtake the placement of the order it cancels.
+// can't overtake the placement of the order it cancels. CommandID is the ID of the
+// command in the command log; the engine passes it on in the event it publishes.
 type Command interface {
 	isCommand()
 }
 
 type PlaceOrder struct {
-	Order orderbook.Order
+	CommandID uuid.UUID
+	Order     orderbook.Order
 }
 
 type CancelOrder struct {
-	OrderID uuid.UUID
+	CommandID uuid.UUID
+	OrderID   uuid.UUID
 }
 
 func (PlaceOrder) isCommand()  {}
@@ -33,12 +36,12 @@ type CommandBus struct {
 	queue       chan Command
 }
 
-func (b *CommandBus) SendPlaceOrder(ctx context.Context, entityOrder entity.Order) error {
-	return b.send(ctx, PlaceOrder{Order: orderbook.NewOrderFromEntity(entityOrder)})
+func (b *CommandBus) SendPlaceOrder(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order) error {
+	return b.send(ctx, PlaceOrder{CommandID: commandID, Order: orderbook.NewOrderFromEntity(entityOrder)})
 }
 
-func (b *CommandBus) SendCancelOrder(ctx context.Context, orderID uuid.UUID) error {
-	return b.send(ctx, CancelOrder{OrderID: orderID})
+func (b *CommandBus) SendCancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error {
+	return b.send(ctx, CancelOrder{CommandID: commandID, OrderID: orderID})
 }
 
 func (b *CommandBus) Receive(ctx context.Context) (Command, error) {

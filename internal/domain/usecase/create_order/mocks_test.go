@@ -40,44 +40,44 @@ func (_m *MockOrderRepository) EXPECT() *MockOrderRepository_Expecter {
 	return &MockOrderRepository_Expecter{mock: &_m.Mock}
 }
 
-// CreateOrder provides a mock function for the type MockOrderRepository
-func (_mock *MockOrderRepository) CreateOrder(ctx context.Context, order entity.Order) error {
-	ret := _mock.Called(ctx, order)
+// CreateOrderCommand provides a mock function for the type MockOrderRepository
+func (_mock *MockOrderRepository) CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error {
+	ret := _mock.Called(ctx, command)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateOrder")
+		panic("no return value specified for CreateOrderCommand")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, entity.Order) error); ok {
-		r0 = returnFunc(ctx, order)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, entity.OrderCommand) error); ok {
+		r0 = returnFunc(ctx, command)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockOrderRepository_CreateOrder_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrder'
-type MockOrderRepository_CreateOrder_Call struct {
+// MockOrderRepository_CreateOrderCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrderCommand'
+type MockOrderRepository_CreateOrderCommand_Call struct {
 	*mock.Call
 }
 
-// CreateOrder is a helper method to define mock.On call
+// CreateOrderCommand is a helper method to define mock.On call
 //   - ctx context.Context
-//   - order entity.Order
-func (_e *MockOrderRepository_Expecter) CreateOrder(ctx any, order any) *MockOrderRepository_CreateOrder_Call {
-	return &MockOrderRepository_CreateOrder_Call{Call: _e.mock.On("CreateOrder", ctx, order)}
+//   - command entity.OrderCommand
+func (_e *MockOrderRepository_Expecter) CreateOrderCommand(ctx any, command any) *MockOrderRepository_CreateOrderCommand_Call {
+	return &MockOrderRepository_CreateOrderCommand_Call{Call: _e.mock.On("CreateOrderCommand", ctx, command)}
 }
 
-func (_c *MockOrderRepository_CreateOrder_Call) Run(run func(ctx context.Context, order entity.Order)) *MockOrderRepository_CreateOrder_Call {
+func (_c *MockOrderRepository_CreateOrderCommand_Call) Run(run func(ctx context.Context, command entity.OrderCommand)) *MockOrderRepository_CreateOrderCommand_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 entity.Order
+		var arg1 entity.OrderCommand
 		if args[1] != nil {
-			arg1 = args[1].(entity.Order)
+			arg1 = args[1].(entity.OrderCommand)
 		}
 		run(
 			arg0,
@@ -87,12 +87,12 @@ func (_c *MockOrderRepository_CreateOrder_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockOrderRepository_CreateOrder_Call) Return(err error) *MockOrderRepository_CreateOrder_Call {
+func (_c *MockOrderRepository_CreateOrderCommand_Call) Return(err error) *MockOrderRepository_CreateOrderCommand_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockOrderRepository_CreateOrder_Call) RunAndReturn(run func(ctx context.Context, order entity.Order) error) *MockOrderRepository_CreateOrder_Call {
+func (_c *MockOrderRepository_CreateOrderCommand_Call) RunAndReturn(run func(ctx context.Context, command entity.OrderCommand) error) *MockOrderRepository_CreateOrderCommand_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -551,16 +551,16 @@ func (_m *MockCommandBus) EXPECT() *MockCommandBus_Expecter {
 }
 
 // SendPlaceOrder provides a mock function for the type MockCommandBus
-func (_mock *MockCommandBus) SendPlaceOrder(ctx context.Context, entityOrder entity.Order) error {
-	ret := _mock.Called(ctx, entityOrder)
+func (_mock *MockCommandBus) SendPlaceOrder(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order) error {
+	ret := _mock.Called(ctx, commandID, entityOrder)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendPlaceOrder")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, entity.Order) error); ok {
-		r0 = returnFunc(ctx, entityOrder)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, entity.Order) error); ok {
+		r0 = returnFunc(ctx, commandID, entityOrder)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -574,24 +574,30 @@ type MockCommandBus_SendPlaceOrder_Call struct {
 
 // SendPlaceOrder is a helper method to define mock.On call
 //   - ctx context.Context
+//   - commandID uuid.UUID
 //   - entityOrder entity.Order
-func (_e *MockCommandBus_Expecter) SendPlaceOrder(ctx any, entityOrder any) *MockCommandBus_SendPlaceOrder_Call {
-	return &MockCommandBus_SendPlaceOrder_Call{Call: _e.mock.On("SendPlaceOrder", ctx, entityOrder)}
+func (_e *MockCommandBus_Expecter) SendPlaceOrder(ctx any, commandID any, entityOrder any) *MockCommandBus_SendPlaceOrder_Call {
+	return &MockCommandBus_SendPlaceOrder_Call{Call: _e.mock.On("SendPlaceOrder", ctx, commandID, entityOrder)}
 }
 
-func (_c *MockCommandBus_SendPlaceOrder_Call) Run(run func(ctx context.Context, entityOrder entity.Order)) *MockCommandBus_SendPlaceOrder_Call {
+func (_c *MockCommandBus_SendPlaceOrder_Call) Run(run func(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order)) *MockCommandBus_SendPlaceOrder_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 entity.Order
+		var arg1 uuid.UUID
 		if args[1] != nil {
-			arg1 = args[1].(entity.Order)
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 entity.Order
+		if args[2] != nil {
+			arg2 = args[2].(entity.Order)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -602,7 +608,7 @@ func (_c *MockCommandBus_SendPlaceOrder_Call) Return(err error) *MockCommandBus_
 	return _c
 }
 
-func (_c *MockCommandBus_SendPlaceOrder_Call) RunAndReturn(run func(ctx context.Context, entityOrder entity.Order) error) *MockCommandBus_SendPlaceOrder_Call {
+func (_c *MockCommandBus_SendPlaceOrder_Call) RunAndReturn(run func(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order) error) *MockCommandBus_SendPlaceOrder_Call {
 	_c.Call.Return(run)
 	return _c
 }

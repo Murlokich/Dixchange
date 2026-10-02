@@ -60,13 +60,32 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 			order.Status == entity.StatusOpen
 	}
 
+	// the order goes to the command log, not to the orders; the same command ID is sent
+	// to the engine, so settlement can find the command
+	var loggedCommandID uuid.UUID
 	orderRepo.EXPECT().
-		CreateOrder(mock.Anything, mock.MatchedBy(matchesExpectedOrder)).
+		CreateOrderCommand(mock.Anything, mock.MatchedBy(func(command entity.OrderCommand) bool {
+			return command.ID != uuid.Nil &&
+				command.Type == entity.OrderCommandPlace &&
+				command.OrderID != uuid.Nil &&
+				command.Place != nil &&
+				command.Place.UserID == validUUID &&
+				command.Place.PairID == validMarketPairID &&
+				command.Place.Side == entity.BuySide &&
+				command.Place.PricePerUnit == validPricePerUnit &&
+				command.Place.Quantity == validQuantityOrdered
+		})).
+		Run(func(_ context.Context, command entity.OrderCommand) {
+			loggedCommandID = command.ID
+		}).
 		Return(nil).
 		Once()
 
 	commandBus.EXPECT().
-		SendPlaceOrder(mock.Anything, mock.MatchedBy(matchesExpectedOrder)).
+		SendPlaceOrder(mock.Anything, mock.Anything, mock.MatchedBy(matchesExpectedOrder)).
+		Run(func(_ context.Context, commandID uuid.UUID, _ entity.Order) {
+			require.Equal(t, loggedCommandID, commandID)
+		}).
 		Return(nil).
 		Once()
 

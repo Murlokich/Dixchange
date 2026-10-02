@@ -39,6 +39,63 @@ func (_m *MockOrderRepository) EXPECT() *MockOrderRepository_Expecter {
 	return &MockOrderRepository_Expecter{mock: &_m.Mock}
 }
 
+// CreateOrderCommand provides a mock function for the type MockOrderRepository
+func (_mock *MockOrderRepository) CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error {
+	ret := _mock.Called(ctx, command)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOrderCommand")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, entity.OrderCommand) error); ok {
+		r0 = returnFunc(ctx, command)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockOrderRepository_CreateOrderCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrderCommand'
+type MockOrderRepository_CreateOrderCommand_Call struct {
+	*mock.Call
+}
+
+// CreateOrderCommand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - command entity.OrderCommand
+func (_e *MockOrderRepository_Expecter) CreateOrderCommand(ctx any, command any) *MockOrderRepository_CreateOrderCommand_Call {
+	return &MockOrderRepository_CreateOrderCommand_Call{Call: _e.mock.On("CreateOrderCommand", ctx, command)}
+}
+
+func (_c *MockOrderRepository_CreateOrderCommand_Call) Run(run func(ctx context.Context, command entity.OrderCommand)) *MockOrderRepository_CreateOrderCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 entity.OrderCommand
+		if args[1] != nil {
+			arg1 = args[1].(entity.OrderCommand)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOrderRepository_CreateOrderCommand_Call) Return(err error) *MockOrderRepository_CreateOrderCommand_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockOrderRepository_CreateOrderCommand_Call) RunAndReturn(run func(ctx context.Context, command entity.OrderCommand) error) *MockOrderRepository_CreateOrderCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOrderCancelInfo provides a mock function for the type MockOrderRepository
 func (_mock *MockOrderRepository) GetOrderCancelInfo(ctx context.Context, orderID uuid.UUID) (entity.OrderCancelInfo, error) {
 	ret := _mock.Called(ctx, orderID)
@@ -133,16 +190,16 @@ func (_m *MockCommandBus) EXPECT() *MockCommandBus_Expecter {
 }
 
 // SendCancelOrder provides a mock function for the type MockCommandBus
-func (_mock *MockCommandBus) SendCancelOrder(ctx context.Context, orderID uuid.UUID) error {
-	ret := _mock.Called(ctx, orderID)
+func (_mock *MockCommandBus) SendCancelOrder(ctx context.Context, commandID uuid.UUID, orderID uuid.UUID) error {
+	ret := _mock.Called(ctx, commandID, orderID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendCancelOrder")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
-		r0 = returnFunc(ctx, orderID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, commandID, orderID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -156,12 +213,13 @@ type MockCommandBus_SendCancelOrder_Call struct {
 
 // SendCancelOrder is a helper method to define mock.On call
 //   - ctx context.Context
+//   - commandID uuid.UUID
 //   - orderID uuid.UUID
-func (_e *MockCommandBus_Expecter) SendCancelOrder(ctx any, orderID any) *MockCommandBus_SendCancelOrder_Call {
-	return &MockCommandBus_SendCancelOrder_Call{Call: _e.mock.On("SendCancelOrder", ctx, orderID)}
+func (_e *MockCommandBus_Expecter) SendCancelOrder(ctx any, commandID any, orderID any) *MockCommandBus_SendCancelOrder_Call {
+	return &MockCommandBus_SendCancelOrder_Call{Call: _e.mock.On("SendCancelOrder", ctx, commandID, orderID)}
 }
 
-func (_c *MockCommandBus_SendCancelOrder_Call) Run(run func(ctx context.Context, orderID uuid.UUID)) *MockCommandBus_SendCancelOrder_Call {
+func (_c *MockCommandBus_SendCancelOrder_Call) Run(run func(ctx context.Context, commandID uuid.UUID, orderID uuid.UUID)) *MockCommandBus_SendCancelOrder_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -171,9 +229,14 @@ func (_c *MockCommandBus_SendCancelOrder_Call) Run(run func(ctx context.Context,
 		if args[1] != nil {
 			arg1 = args[1].(uuid.UUID)
 		}
+		var arg2 uuid.UUID
+		if args[2] != nil {
+			arg2 = args[2].(uuid.UUID)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -184,7 +247,7 @@ func (_c *MockCommandBus_SendCancelOrder_Call) Return(err error) *MockCommandBus
 	return _c
 }
 
-func (_c *MockCommandBus_SendCancelOrder_Call) RunAndReturn(run func(ctx context.Context, orderID uuid.UUID) error) *MockCommandBus_SendCancelOrder_Call {
+func (_c *MockCommandBus_SendCancelOrder_Call) RunAndReturn(run func(ctx context.Context, commandID uuid.UUID, orderID uuid.UUID) error) *MockCommandBus_SendCancelOrder_Call {
 	_c.Call.Return(run)
 	return _c
 }

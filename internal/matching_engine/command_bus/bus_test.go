@@ -53,13 +53,13 @@ func TestCommandBus_MultipleSendersPreserveHandoffOrder(t *testing.T) {
 	done := make(chan error, 2)
 
 	go func() {
-		if err := bus.SendPlaceOrder(context.Background(), order1); err != nil {
+		if err := bus.SendPlaceOrder(context.Background(), uuid.New(), order1); err != nil {
 			done <- err
 			return
 		}
 		baton <- struct{}{} // let s2 place order2
 		<-baton             // wait for order2 to be placed
-		if err := bus.SendCancelOrder(context.Background(), order1.ID); err != nil {
+		if err := bus.SendCancelOrder(context.Background(), uuid.New(), order1.ID); err != nil {
 			done <- err
 			return
 		}
@@ -69,13 +69,13 @@ func TestCommandBus_MultipleSendersPreserveHandoffOrder(t *testing.T) {
 
 	go func() {
 		<-baton // wait for order1 to be placed
-		if err := bus.SendPlaceOrder(context.Background(), order2); err != nil {
+		if err := bus.SendPlaceOrder(context.Background(), uuid.New(), order2); err != nil {
 			done <- err
 			return
 		}
 		baton <- struct{}{} // let s1 cancel order1
 		<-baton             // wait for order1 to be cancelled
-		done <- bus.SendCancelOrder(context.Background(), order2.ID)
+		done <- bus.SendCancelOrder(context.Background(), uuid.New(), order2.ID)
 	}()
 
 	require.NoError(t, <-done)
@@ -104,10 +104,10 @@ func TestCommandBus_Send_RespectsSendTimeout(t *testing.T) {
 	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: sendTimeout})
 
 	first := newTestOrder()
-	require.NoError(t, bus.SendPlaceOrder(context.Background(), first))
+	require.NoError(t, bus.SendPlaceOrder(context.Background(), uuid.New(), first))
 
 	start := time.Now()
-	err := bus.SendCancelOrder(context.Background(), first.ID)
+	err := bus.SendCancelOrder(context.Background(), uuid.New(), first.ID)
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
@@ -137,7 +137,7 @@ func TestCommandBus_Send_ReturnsErrorWhenContextCancelledExternally(t *testing.T
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- bus.SendPlaceOrder(ctx, newTestOrder())
+		errCh <- bus.SendPlaceOrder(ctx, uuid.New(), newTestOrder())
 	}()
 
 	time.Sleep(20 * time.Millisecond) // let the send reach the select

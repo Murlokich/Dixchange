@@ -20,6 +20,8 @@ type TradeRepository interface {
 }
 
 type OrderRepository interface {
+	TakeOrderCommand(ctx context.Context, commandID uuid.UUID) (entity.OrderCommand, error)
+	CreateOrder(ctx context.Context, order entity.Order) error
 	FillOrder(ctx context.Context, orderID uuid.UUID, quantity int64) error
 	GetOrderForUpdate(ctx context.Context, orderID uuid.UUID) (entity.Order, error)
 	CancelOrder(ctx context.Context, orderID uuid.UUID) error
@@ -39,7 +41,9 @@ type TXManager interface {
 }
 
 // SettlementService applies what the matching engine did to the book onto the database.
-// It consumes the engine's events one at a time, in the order they were produced.
+// It consumes the engine's events one at a time, in the order they were produced. Each
+// event names the command it came from, and the command is removed from the command log
+// in the transaction that puts its effect into the orders.
 type SettlementService struct {
 	eventBus   EventBus
 	tradeRepo  TradeRepository
@@ -62,13 +66,17 @@ func (s *SettlementService) Run(ctx context.Context) {
 			continue
 		}
 
-		logger := s.logger
+		var commandID uuid.UUID
 		switch e := event.(type) {
-		case eventbus.TradesExecuted:
-			err = s.settleTrades(ctx, e.Trades)
+		case eventbus.OrderPlaced:
+			commandID = e.CommandID
+			err = s.settlePlacement(ctx, e)
 		case eventbus.OrderCancelled:
-			logger = logger.WithField("order_id", e.OrderID)
-			err = s.executeCancellation(ctx, e.OrderID)
+			commandID = e.CommandID
+			err = s.executeCancellation(ctx, e.CommandID)
+		case eventbus.CancelRejected:
+			commandID = e.CommandID
+			err = s.dropCancel(ctx, e.CommandID)
 		default:
 			s.logger.Errorf("unknown event type %T", event)
 			continue
@@ -78,36 +86,78 @@ func (s *SettlementService) Run(ctx context.Context) {
 				// TODO: graceful shutdown
 				return
 			}
-			// TODO: the engine has already applied this event to the book, so the book and
-			// the DB now diverge (a trade not settled, or a cancelled order still active with
-			// its funds reserved). Decide on one strategy for both: halt so the restart
-			// reloads the book from the DB, or persist the event and retry.
-			logger.Errorf("settle %T: %v", event, err)
+			// TODO(recovery): the engine has already applied this command to the book, so
+			// the book and the DB now diverge (a trade not settled, or a cancelled order
+			// still active with its funds reserved). Reload the engine from the orders and
+			// the command log instead of carrying on with the next event.
+			s.logger.WithField("command_id", commandID).Errorf("settle %T: %v", event, err)
 		}
 	}
 }
 
-// settleTrades settles the trades one by one. A failed trade doesn't stop the rest of the
-// batch from settling: every failure is returned, joined.
-func (s *SettlementService) settleTrades(ctx context.Context, trades []entity.Trade) error {
-	var errs []error
-	for i := range trades {
-		if err := s.executeTrade(ctx, trades[i]); err != nil {
-			if errors.Is(err, context.Canceled) {
-				return err
-			}
-			errs = append(errs, pkgerrors.Wrapf(err, "execute trade of bid order %s and ask order %s",
-				trades[i].Bid.OrderID, trades[i].Ask.OrderID))
-		}
-	}
-	return errors.Join(errs...)
-}
-
-// executeCancellation marks the order cancelled and releases the funds still reserved
-// for its unfilled part, within one transaction. Events are settled in order, so every
-// trade of the order is already settled and its filled quantity in the DB is final.
-func (s *SettlementService) executeCancellation(ctx context.Context, orderID uuid.UUID) error {
+// settlePlacement puts the placed order into the orders and settles the trades it produced.
+//
+// The order is inserted and its command removed from the command log in one transaction,
+// before any trade: the command must not outlive the order's first appearance in the
+// orders, or replaying the log would place the order a second time. Each trade is then
+// settled in its own transaction, and a trade that fails stops the rest: the trades left
+// unsettled are matched again once the engine is reloaded from the orders.
+func (s *SettlementService) settlePlacement(ctx context.Context, event eventbus.OrderPlaced) error {
 	fn := func(ctx context.Context) error {
+		command, err := s.orderRepo.TakeOrderCommand(ctx, event.CommandID)
+		if err != nil {
+			return pkgerrors.Wrap(err, "order repo take order command")
+		}
+		order, err := command.PlacedOrder()
+		if err != nil {
+			return pkgerrors.Wrap(err, "order command placed order")
+		}
+		if err = s.orderRepo.CreateOrder(ctx, order); err != nil {
+			return pkgerrors.Wrap(err, "order repo create order")
+		}
+		return nil
+	}
+	if err := s.txManager.WithTX(ctx, fn); err != nil {
+		return pkgerrors.Wrap(err, "tx manager with tx")
+	}
+
+	for i := range event.Trades {
+		if err := s.executeTrade(ctx, event.Trades[i]); err != nil {
+			return pkgerrors.Wrapf(err, "execute trade of bid order %s and ask order %s",
+				event.Trades[i].Bid.OrderID, event.Trades[i].Ask.OrderID)
+		}
+	}
+	return nil
+}
+
+// dropCancel removes a cancel command the engine had nothing to apply for: the order
+// wasn't in the book anymore, so there is nothing to change in the orders.
+func (s *SettlementService) dropCancel(ctx context.Context, commandID uuid.UUID) error {
+	command, err := s.orderRepo.TakeOrderCommand(ctx, commandID)
+	if err != nil {
+		return pkgerrors.Wrap(err, "order repo take order command")
+	}
+	if command.Type != entity.OrderCommandCancel {
+		return pkgerrors.Errorf("order command %s is %s, not cancel", command.ID, command.Type)
+	}
+	return nil
+}
+
+// executeCancellation marks the order cancelled, releases the funds still reserved for
+// its unfilled part and removes the cancel command from the command log, within one
+// transaction. Events are settled in order, so every trade of the order is already
+// settled and its filled quantity in the DB is final.
+func (s *SettlementService) executeCancellation(ctx context.Context, commandID uuid.UUID) error {
+	fn := func(ctx context.Context) error {
+		command, err := s.orderRepo.TakeOrderCommand(ctx, commandID)
+		if err != nil {
+			return pkgerrors.Wrap(err, "order repo take order command")
+		}
+		if command.Type != entity.OrderCommandCancel {
+			return pkgerrors.Errorf("order command %s is %s, not cancel", command.ID, command.Type)
+		}
+		orderID := command.OrderID
+
 		order, err := s.orderRepo.GetOrderForUpdate(ctx, orderID)
 		if err != nil {
 			return pkgerrors.Wrap(err, "order repo get order for update")

@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	"github.com/dixchange/Monolith/pkg"
@@ -141,6 +142,85 @@ func (r *Repository) CancelOrder(ctx context.Context, orderID uuid.UUID) error {
 	}
 
 	return nil
+}
+
+// placeOrderPayload is the stored form of entity.PlaceOrderDetails. It is kept apart from
+// the domain type so a change there can't silently break reading commands already stored.
+type placeOrderPayload struct {
+	UserID   uuid.UUID `json:"user_id"`
+	PairID   int       `json:"pair_id"`
+	Side     string    `json:"side"`
+	Price    int64     `json:"price"`
+	Quantity int64     `json:"quantity"`
+}
+
+// CreateOrderCommand appends the command to the command log.
+func (r *Repository) CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	var place []byte
+	if command.Place != nil {
+		var err error
+		place, err = json.Marshal(placeOrderPayload{
+			UserID:   command.Place.UserID,
+			PairID:   command.Place.PairID,
+			Side:     command.Place.Side,
+			Price:    command.Place.PricePerUnit,
+			Quantity: command.Place.Quantity,
+		})
+		if err != nil {
+			return errors.Wrap(err, "marshal place order payload")
+		}
+	}
+
+	if err := q.CreateOrderCommand(ctx, CreateOrderCommandParams{
+		ID:      command.ID,
+		Type:    OrderCommandType(command.Type),
+		OrderID: command.OrderID,
+		Place:   place,
+	}); err != nil {
+		return errors.Wrap(err, "query create order command")
+	}
+
+	return nil
+}
+
+// TakeOrderCommand deletes the command from the command log and returns it. It is meant
+// to be called within the transaction that applies the command, so the command is gone
+// exactly when its effect is in the orders.
+func (r *Repository) TakeOrderCommand(ctx context.Context, commandID uuid.UUID) (entity.OrderCommand, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	row, err := q.TakeOrderCommand(ctx, commandID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.OrderCommand{}, errors.Errorf("order command %s doesn't exist", commandID)
+		}
+		return entity.OrderCommand{}, errors.Wrap(err, "query take order command")
+	}
+
+	command := entity.OrderCommand{
+		ID:      row.ID,
+		Type:    entity.OrderCommandType(row.Type),
+		OrderID: row.OrderID,
+	}
+	if row.Place != nil {
+		var payload placeOrderPayload
+		if err = json.Unmarshal(row.Place, &payload); err != nil {
+			return entity.OrderCommand{}, errors.Wrapf(err, "unmarshal place order payload of command %s", row.ID)
+		}
+		command.Place = &entity.PlaceOrderDetails{
+			UserID:       payload.UserID,
+			PairID:       payload.PairID,
+			Side:         payload.Side,
+			PricePerUnit: payload.Price,
+			Quantity:     payload.Quantity,
+		}
+	}
+
+	return command, nil
 }
 
 func rowToOrder(row OrderOrder) entity.Order {

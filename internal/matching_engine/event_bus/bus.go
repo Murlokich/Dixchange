@@ -11,34 +11,49 @@ import (
 // Event is a fact the matching engine has already applied to the book. All events of a
 // book go through one bus, so they are settled in the order the engine produced them:
 // a cancel is never settled before the trades the order took part in.
+//
+// The engine publishes exactly one event per command, carrying the command's ID, so
+// settlement can apply the command and remove it from the command log.
 type Event interface {
 	isEvent()
 }
 
-type TradesExecuted struct {
-	Trades []entity.Trade
+// OrderPlaced is published for every placed order, with the trades it produced (none
+// when the order went to the book without matching).
+type OrderPlaced struct {
+	CommandID uuid.UUID
+	Trades    []entity.Trade
 }
 
+// OrderCancelled is published when the order was removed from the book.
 type OrderCancelled struct {
-	OrderID uuid.UUID
+	CommandID uuid.UUID
 }
 
-func (TradesExecuted) isEvent() {}
+// CancelRejected is published when the order to cancel wasn't in the book: it was
+// filled, or already cancelled, before the command reached the engine.
+type CancelRejected struct {
+	CommandID uuid.UUID
+}
+
+func (OrderPlaced) isEvent()    {}
 func (OrderCancelled) isEvent() {}
+func (CancelRejected) isEvent() {}
 
 type EventBus struct {
 	queue chan Event
 }
 
-func (b *EventBus) PublishTrades(ctx context.Context, trades []entity.Trade) error {
-	if len(trades) == 0 {
-		return nil
-	}
-	return b.publish(ctx, TradesExecuted{Trades: trades})
+func (b *EventBus) PublishOrderPlaced(ctx context.Context, commandID uuid.UUID, trades []entity.Trade) error {
+	return b.publish(ctx, OrderPlaced{CommandID: commandID, Trades: trades})
 }
 
-func (b *EventBus) PublishOrderCancelled(ctx context.Context, orderID uuid.UUID) error {
-	return b.publish(ctx, OrderCancelled{OrderID: orderID})
+func (b *EventBus) PublishOrderCancelled(ctx context.Context, commandID uuid.UUID) error {
+	return b.publish(ctx, OrderCancelled{CommandID: commandID})
+}
+
+func (b *EventBus) PublishCancelRejected(ctx context.Context, commandID uuid.UUID) error {
+	return b.publish(ctx, CancelRejected{CommandID: commandID})
 }
 
 func (b *EventBus) Consume(ctx context.Context) (Event, error) {

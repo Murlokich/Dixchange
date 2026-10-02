@@ -23,8 +23,9 @@ type CommandBus interface {
 }
 
 type EventBus interface {
-	PublishTrades(ctx context.Context, trades []entity.Trade) error
-	PublishOrderCancelled(ctx context.Context, orderID uuid.UUID) error
+	PublishOrderPlaced(ctx context.Context, commandID uuid.UUID, trades []entity.Trade) error
+	PublishOrderCancelled(ctx context.Context, commandID uuid.UUID) error
+	PublishCancelRejected(ctx context.Context, commandID uuid.UUID) error
 }
 
 type MatchingEngine struct {
@@ -50,10 +51,10 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 		switch c := command.(type) {
 		case commandbus.PlaceOrder:
 			orderID = c.Order.ID
-			err = m.placeOrder(ctx, c.Order)
+			err = m.placeOrder(ctx, c.CommandID, c.Order)
 		case commandbus.CancelOrder:
 			orderID = c.OrderID
-			err = m.cancelOrder(ctx, c.OrderID)
+			err = m.cancelOrder(ctx, c.CommandID, c.OrderID)
 		default:
 			m.logger.Errorf("unknown command type %T", command)
 			continue
@@ -63,42 +64,51 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 				// TODO: graceful shutdown
 				return
 			}
+			// TODO(recovery): the command stays in the command log, but the book may
+			// already have applied it (publish failed) or be corrupted (book error), so
+			// the book and the DB diverge. Reload the engine from the orders and the
+			// command log instead of carrying on.
 			m.logger.WithField("order_id", orderID).Errorf("handle %T: %v", command, err)
 		}
 	}
 }
 
 // placeOrder matches the order against the book and publishes the trades it produced.
-func (m *MatchingEngine) placeOrder(ctx context.Context, order orderbook.Order) error {
+// The event is published even without trades, so the order reaches the orders.
+func (m *MatchingEngine) placeOrder(ctx context.Context, commandID uuid.UUID, order orderbook.Order) error {
 	trades, err := m.book.AddOrder(&order)
 	if err != nil {
 		return pkgerrors.Wrap(err, "book add order")
 	}
 	entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
-	if err = m.eventBus.PublishTrades(ctx, entityTrades); err != nil {
-		return pkgerrors.Wrap(err, "eventBus PublishTrades")
+	if err = m.eventBus.PublishOrderPlaced(ctx, commandID, entityTrades); err != nil {
+		return pkgerrors.Wrap(err, "eventBus PublishOrderPlaced")
 	}
 	return nil
 }
 
 // cancelOrder removes the order from the book and publishes the cancellation, so the
 // funds still reserved for it get released.
-func (m *MatchingEngine) cancelOrder(ctx context.Context, orderID uuid.UUID) error {
+func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error {
 	cancelled, err := m.book.CancelOrder(orderID)
 	if err != nil {
-		// TODO: an error here means the book's internal state is broken (a list node that
+		// TODO(recovery): an error here means the book's internal state is broken (a list node that
 		// isn't an order, a price level that can't be deleted), not a bad request. Decide
 		// whether the engine should halt instead of carrying on with a corrupted book.
 		return pkgerrors.Wrap(err, "book cancel order")
 	}
 	if !cancelled {
 		// Normal outcome: the order was filled, or already cancelled, before this command
-		// reached the engine. There is nothing to release, so nothing is published.
+		// reached the engine. There is nothing to release, but the command is published
+		// anyway so settlement removes it from the command log.
 		m.logger.WithField("order_id", orderID).Infof("order to cancel is not in the book")
+		if err = m.eventBus.PublishCancelRejected(ctx, commandID); err != nil {
+			return pkgerrors.Wrap(err, "eventBus PublishCancelRejected")
+		}
 		return nil
 	}
 
-	if err = m.eventBus.PublishOrderCancelled(ctx, orderID); err != nil {
+	if err = m.eventBus.PublishOrderCancelled(ctx, commandID); err != nil {
 		return pkgerrors.Wrap(err, "eventBus PublishOrderCancelled")
 	}
 	return nil

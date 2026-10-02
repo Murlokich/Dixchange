@@ -12,6 +12,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type OrderCommandType string
+
+const (
+	OrderCommandTypePlace  OrderCommandType = "place"
+	OrderCommandTypeCancel OrderCommandType = "cancel"
+)
+
+func (e *OrderCommandType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OrderCommandType(s)
+	case string:
+		*e = OrderCommandType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OrderCommandType: %T", src)
+	}
+	return nil
+}
+
+type NullOrderCommandType struct {
+	OrderCommandType OrderCommandType
+	Valid            bool // Valid is true if OrderCommandType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOrderCommandType) Scan(value interface{}) error {
+	if value == nil {
+		ns.OrderCommandType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OrderCommandType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOrderCommandType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OrderCommandType), nil
+}
+
 type OrderSide string
 
 const (
@@ -52,6 +94,13 @@ func (ns NullOrderSide) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.OrderSide), nil
+}
+
+type OrderCommandLogUsdKcn struct {
+	ID      uuid.UUID
+	Type    OrderCommandType
+	OrderID uuid.UUID
+	Place   []byte
 }
 
 type OrderOrder struct {

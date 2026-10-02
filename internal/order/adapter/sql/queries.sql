@@ -27,3 +27,10 @@ UPDATE "order"."order"
 SET status = 'cancelled',
     last_updated_at = NOW()
 WHERE id = $1;
+
+-- name: CreateOrderCommand :exec
+INSERT INTO "order".command_log_usd_kcn (id, type, order_id, place)
+    VALUES ($1, $2, $3, $4);
+
+-- name: TakeOrderCommand :one
+DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING *;

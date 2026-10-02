@@ -54,6 +54,28 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 	return err
 }
 
+const createOrderCommand = `-- name: CreateOrderCommand :exec
+INSERT INTO "order".command_log_usd_kcn (id, type, order_id, place)
+    VALUES ($1, $2, $3, $4)
+`
+
+type CreateOrderCommandParams struct {
+	ID      uuid.UUID
+	Type    OrderCommandType
+	OrderID uuid.UUID
+	Place   []byte
+}
+
+func (q *Queries) CreateOrderCommand(ctx context.Context, arg CreateOrderCommandParams) error {
+	_, err := q.db.Exec(ctx, createOrderCommand,
+		arg.ID,
+		arg.Type,
+		arg.OrderID,
+		arg.Place,
+	)
+	return err
+}
+
 const fillOrder = `-- name: FillOrder :execrows
 UPDATE "order"."order"
 SET quantity_filled = quantity_filled + $1::bigint,
@@ -154,4 +176,20 @@ func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrders
 		return nil, err
 	}
 	return items, nil
+}
+
+const takeOrderCommand = `-- name: TakeOrderCommand :one
+DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING id, type, order_id, place
+`
+
+func (q *Queries) TakeOrderCommand(ctx context.Context, id uuid.UUID) (OrderCommandLogUsdKcn, error) {
+	row := q.db.QueryRow(ctx, takeOrderCommand, id)
+	var i OrderCommandLogUsdKcn
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.OrderID,
+		&i.Place,
+	)
+	return i, err
 }
