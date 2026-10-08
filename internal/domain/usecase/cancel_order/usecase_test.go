@@ -24,7 +24,7 @@ func isCancelCommand(command entity.OrderCommand) bool {
 	return command.ID != uuid.Nil &&
 		command.Type == entity.OrderCommandCancel &&
 		command.OrderID == orderID &&
-		command.Place == nil
+		command.OrderDetails == nil
 }
 
 func TestUseCase_Execute_SendsCancelForActiveOwnedOrder(t *testing.T) {

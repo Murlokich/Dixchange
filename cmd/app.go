@@ -146,7 +146,7 @@ func main() {
 	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
 	eventBus := eventbus.NewEventBus(&cfg.EventBusConfig)
 
-	matchingEngine := engine.NewMatchingEngine(orderBook, commandBus, eventBus, log)
+	matchingEngine := engine.NewMatchingEngine(orderBook, commandBus, eventBus, orderRepo, log)
 	settlementService := tradeservice.NewSettlementService(
 		eventBus,
 		tradeRepo,
@@ -159,6 +159,9 @@ func main() {
 
 	// Start matching engine and settlement service before any traffic comes in
 	go func() {
+		if err := matchingEngine.LoadOrderBook(ctx); err != nil {
+			panic(err)
+		}
 		matchingEngine.Run(ctx)
 	}()
 	go func() {

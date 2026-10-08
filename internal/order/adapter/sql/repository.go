@@ -144,41 +144,25 @@ func (r *Repository) CancelOrder(ctx context.Context, orderID uuid.UUID) error {
 	return nil
 }
 
-// placeOrderPayload is the stored form of entity.PlaceOrderDetails. It is kept apart from
-// the domain type so a change there can't silently break reading commands already stored.
-type placeOrderPayload struct {
-	UserID   uuid.UUID `json:"user_id"`
-	PairID   int       `json:"pair_id"`
-	Side     string    `json:"side"`
-	Price    int64     `json:"price"`
-	Quantity int64     `json:"quantity"`
-}
-
 // CreateOrderCommand appends the command to the command log.
 func (r *Repository) CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error {
 	db := r.txGetter(ctx, r.db)
 	q := New(db)
 
-	var place []byte
-	if command.Place != nil {
+	var orderDetails []byte
+	if command.OrderDetails != nil {
 		var err error
-		place, err = json.Marshal(placeOrderPayload{
-			UserID:   command.Place.UserID,
-			PairID:   command.Place.PairID,
-			Side:     command.Place.Side,
-			Price:    command.Place.PricePerUnit,
-			Quantity: command.Place.Quantity,
-		})
+		orderDetails, err = json.Marshal(command.OrderDetails)
 		if err != nil {
-			return errors.Wrap(err, "marshal place order payload")
+			return errors.Wrap(err, "marshal order details")
 		}
 	}
 
 	if err := q.CreateOrderCommand(ctx, CreateOrderCommandParams{
-		ID:      command.ID,
-		Type:    OrderCommandType(command.Type),
-		OrderID: command.OrderID,
-		Place:   place,
+		ID:           command.ID,
+		Type:         OrderCommandType(command.Type),
+		OrderID:      command.OrderID,
+		OrderDetails: orderDetails,
 	}); err != nil {
 		return errors.Wrap(err, "query create order command")
 	}
@@ -201,26 +185,40 @@ func (r *Repository) TakeOrderCommand(ctx context.Context, commandID uuid.UUID) 
 		return entity.OrderCommand{}, errors.Wrap(err, "query take order command")
 	}
 
-	command := entity.OrderCommand{
-		ID:      row.ID,
-		Type:    entity.OrderCommandType(row.Type),
-		OrderID: row.OrderID,
-	}
-	if row.Place != nil {
-		var payload placeOrderPayload
-		if err = json.Unmarshal(row.Place, &payload); err != nil {
-			return entity.OrderCommand{}, errors.Wrapf(err, "unmarshal place order payload of command %s", row.ID)
-		}
-		command.Place = &entity.PlaceOrderDetails{
-			UserID:       payload.UserID,
-			PairID:       payload.PairID,
-			Side:         payload.Side,
-			PricePerUnit: payload.Price,
-			Quantity:     payload.Quantity,
-		}
+	command, err := rowToCommand(row)
+	if err != nil {
+		return entity.OrderCommand{}, errors.Wrap(err, "rowToCommand")
 	}
 
 	return command, nil
+}
+
+func (r *Repository) GetAllOpenOrders(ctx context.Context) ([]entity.Order, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.GetAllOpenOrders(ctx)
+	if err != nil {
+		return []entity.Order{}, errors.Wrap(err, "query GetAllOpenOrders")
+	}
+
+	return rowsToOrder(rows), nil
+}
+
+func (r *Repository) GetAllCommands(ctx context.Context) ([]entity.OrderCommand, error) {
+	db := r.txGetter(ctx, r.db)
+	q := New(db)
+
+	rows, err := q.GetAllCommands(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "query GetAllCommands")
+	}
+
+	cmds, err := rowsToCommands(rows)
+	if err != nil {
+		return nil, errors.Wrap(err, "rowsToCommands")
+	}
+	return cmds, nil
 }
 
 func rowToOrder(row OrderOrder) entity.Order {
@@ -237,6 +235,46 @@ func rowToOrder(row OrderOrder) entity.Order {
 		// NULL last_updated_at means the order was never updated, so the zero time is right.
 		LastUpdatedAt: row.LastUpdatedAt.Time,
 	}
+}
+
+func rowsToOrder(rows []OrderOrder) []entity.Order {
+	orders := make([]entity.Order, len(rows))
+	for i := range rows {
+		orders[i] = rowToOrder(rows[i])
+	}
+	return orders
+}
+
+func rowToCommand(row OrderCommandLogUsdKcn) (entity.OrderCommand, error) {
+	command := entity.OrderCommand{
+		ID:      row.ID,
+		Type:    entity.OrderCommandType(string(row.Type)),
+		OrderID: row.OrderID,
+	}
+
+	// fill the order details if command is for order creation
+	if command.Type == entity.OrderCommandCreate {
+		var orderDetails entity.OrderDetails
+		if err := json.Unmarshal(row.OrderDetails, &orderDetails); err != nil {
+			return entity.OrderCommand{}, errors.Wrapf(err, "unmarshal order details of command %s", row.ID)
+		}
+		command.OrderDetails = &orderDetails
+	}
+
+	return command, nil
+}
+
+func rowsToCommands(rows []OrderCommandLogUsdKcn) ([]entity.OrderCommand, error) {
+	cmds := make([]entity.OrderCommand, len(rows))
+
+	for i := range rows {
+		cmd, err := rowToCommand(rows[i])
+		if err != nil {
+			return nil, errors.Wrap(err, "rowToCommand")
+		}
+		cmds[i] = cmd
+	}
+	return cmds, nil
 }
 
 func NewRepository(db DBTX, txGetter pkg.TXGetter) *Repository {

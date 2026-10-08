@@ -2,7 +2,8 @@ package engine
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	commandbus "github.com/dixchange/Monolith/internal/matching_engine/command_bus"
@@ -28,10 +29,16 @@ type EventBus interface {
 	PublishCancelRejected(ctx context.Context, commandID uuid.UUID) error
 }
 
+type OrderRepository interface {
+	GetAllOpenOrders(ctx context.Context) ([]entity.Order, error)
+	GetAllCommands(ctx context.Context) ([]entity.OrderCommand, error)
+}
+
 type MatchingEngine struct {
 	book       OrderBook
 	commandBus CommandBus
 	eventBus   EventBus
+	orderRepo  OrderRepository
 	logger     pkg.Logger
 }
 
@@ -47,18 +54,7 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 			continue
 		}
 
-		var orderID uuid.UUID
-		switch c := command.(type) {
-		case commandbus.PlaceOrder:
-			orderID = c.Order.ID
-			err = m.placeOrder(ctx, c.CommandID, c.Order)
-		case commandbus.CancelOrder:
-			orderID = c.OrderID
-			err = m.cancelOrder(ctx, c.CommandID, c.OrderID)
-		default:
-			m.logger.Errorf("unknown command type %T", command)
-			continue
-		}
+		orderID, err := m.processCommand(ctx, command)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				// TODO: graceful shutdown
@@ -70,6 +66,22 @@ func (m *MatchingEngine) Run(ctx context.Context) {
 			// command log instead of carrying on.
 			m.logger.WithField("order_id", orderID).Errorf("handle %T: %v", command, err)
 		}
+	}
+}
+
+func NewMatchingEngine(
+	book OrderBook,
+	commandBus CommandBus,
+	eventBus EventBus,
+	orderRepo OrderRepository,
+	logger pkg.Logger,
+) *MatchingEngine {
+	return &MatchingEngine{
+		book:       book,
+		commandBus: commandBus,
+		eventBus:   eventBus,
+		orderRepo:  orderRepo,
+		logger:     logger,
 	}
 }
 
@@ -114,18 +126,74 @@ func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uui
 	return nil
 }
 
-func NewMatchingEngine(
-	book OrderBook,
-	commandBus CommandBus,
-	eventBus EventBus,
-	logger pkg.Logger,
-) *MatchingEngine {
-	return &MatchingEngine{
-		book:       book,
-		commandBus: commandBus,
-		eventBus:   eventBus,
-		logger:     logger,
+func (m *MatchingEngine) LoadOrderBook(ctx context.Context) error {
+	m.logger.Infof("order book loading has been started")
+	if err := m.loadOpenOrders(ctx); err != nil {
+		return errors.Wrap(err, "loaodOpenOrders")
 	}
+	m.logger.Infof("open orders have been loaded successfully")
+	if err := m.applyRequestLog(ctx); err != nil {
+		return errors.Wrap(err, "applyRequestLog")
+	}
+	m.logger.Infof("request log has been successfully applied")
+	return nil
+}
+
+func (m *MatchingEngine) loadOpenOrders(ctx context.Context) error {
+	orders, err := m.orderRepo.GetAllOpenOrders(ctx)
+	if err != nil {
+		return errors.Wrap(err, "order repo GetAllOpenOrders")
+	}
+	for i := range orders {
+		order := orderbook.NewOrderFromEntity(orders[i])
+		trades, err := m.book.AddOrder(&order)
+		if err != nil {
+			return errors.Wrap(err, "book AddOrder")
+		}
+		if len(trades) != 0 {
+			return errors.Errorf("unexpected trade produced by resting orders: %v", trades)
+		}
+	}
+	return nil
+}
+
+func (m *MatchingEngine) applyRequestLog(ctx context.Context) error {
+	commands, err := m.orderRepo.GetAllCommands(ctx)
+	if err != nil {
+		return errors.Wrap(err, "order repo GetAllCommands")
+	}
+	for i := range commands {
+		cmd, err := logEntryToBusCommand(commands[i])
+		if err != nil {
+			return errors.Wrap(err, "logEntryToBusCommand")
+		}
+		orderID, err := m.processCommand(ctx, cmd)
+		if err != nil {
+			m.logger.WithField("order_id", orderID).Errorf("processCommand %v: %v", cmd, err)
+			return errors.Wrap(err, "processCommand")
+		}
+	}
+	return nil
+}
+
+// processCommand returns orderID for logging purposes
+func (m *MatchingEngine) processCommand(ctx context.Context, command commandbus.Command) (uuid.UUID, error) {
+	var orderID uuid.UUID
+	var err error
+	switch c := command.(type) {
+	case commandbus.PlaceOrder:
+		orderID = c.Order.ID
+		err = m.placeOrder(ctx, c.CommandID, c.Order)
+	case commandbus.CancelOrder:
+		orderID = c.OrderID
+		err = m.cancelOrder(ctx, c.CommandID, c.OrderID)
+	default:
+		err = errors.Errorf("unknown command type %T", command)
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return orderID, nil
 }
 
 // The book matches a single pair, so the pair is stamped onto every trade it produced
@@ -142,4 +210,26 @@ func orderbookToEntityTrades(trades []orderbook.Trade, pair entity.Pair) []entit
 		}
 	}
 	return entityTrades
+}
+
+func logEntryToBusCommand(cmd entity.OrderCommand) (commandbus.Command, error) {
+	switch cmd.Type {
+	case entity.OrderCommandCreate:
+		order, err := cmd.CreatedOrder()
+		if err != nil {
+			return nil, errors.Wrap(err, "command CreatedOrder")
+		}
+		return commandbus.PlaceOrder{
+			CommandID: cmd.ID,
+			Order:     orderbook.NewOrderFromEntity(order),
+		}, nil
+
+	case entity.OrderCommandCancel:
+		return commandbus.CancelOrder{
+			CommandID: cmd.ID,
+			OrderID:   cmd.OrderID,
+		}, nil
+	default:
+		return nil, entity.InvalidCommandType{CommandType: string(cmd.Type)}
+	}
 }

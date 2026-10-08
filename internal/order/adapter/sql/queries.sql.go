@@ -55,15 +55,15 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 }
 
 const createOrderCommand = `-- name: CreateOrderCommand :exec
-INSERT INTO "order".command_log_usd_kcn (id, type, order_id, place)
+INSERT INTO "order".command_log_usd_kcn (id, type, order_id, order_details)
     VALUES ($1, $2, $3, $4)
 `
 
 type CreateOrderCommandParams struct {
-	ID      uuid.UUID
-	Type    OrderCommandType
-	OrderID uuid.UUID
-	Place   []byte
+	ID           uuid.UUID
+	Type         OrderCommandType
+	OrderID      uuid.UUID
+	OrderDetails []byte
 }
 
 func (q *Queries) CreateOrderCommand(ctx context.Context, arg CreateOrderCommandParams) error {
@@ -71,7 +71,7 @@ func (q *Queries) CreateOrderCommand(ctx context.Context, arg CreateOrderCommand
 		arg.ID,
 		arg.Type,
 		arg.OrderID,
-		arg.Place,
+		arg.OrderDetails,
 	)
 	return err
 }
@@ -98,6 +98,70 @@ func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getAllCommands = `-- name: GetAllCommands :many
+SELECT id, type, order_id, order_details FROM "order".command_log_usd_kcn ORDER BY id ASC
+`
+
+func (q *Queries) GetAllCommands(ctx context.Context) ([]OrderCommandLogUsdKcn, error) {
+	rows, err := q.db.Query(ctx, getAllCommands)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrderCommandLogUsdKcn
+	for rows.Next() {
+		var i OrderCommandLogUsdKcn
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.OrderID,
+			&i.OrderDetails,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllOpenOrders = `-- name: GetAllOpenOrders :many
+SELECT id, user_id, market_pair_id, side, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE status IN ('open', 'partially_filled') ORDER BY created_at ASC
+`
+
+func (q *Queries) GetAllOpenOrders(ctx context.Context) ([]OrderOrder, error) {
+	rows, err := q.db.Query(ctx, getAllOpenOrders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrderOrder
+	for rows.Next() {
+		var i OrderOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MarketPairID,
+			&i.Side,
+			&i.QuantityOrdered,
+			&i.QuantityFilled,
+			&i.Price,
+			&i.Status,
+			&i.CreatedAt,
+			&i.LastUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getOrderCancelInfo = `-- name: GetOrderCancelInfo :one
@@ -179,7 +243,7 @@ func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrders
 }
 
 const takeOrderCommand = `-- name: TakeOrderCommand :one
-DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING id, type, order_id, place
+DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING id, type, order_id, order_details
 `
 
 func (q *Queries) TakeOrderCommand(ctx context.Context, id uuid.UUID) (OrderCommandLogUsdKcn, error) {
@@ -189,7 +253,7 @@ func (q *Queries) TakeOrderCommand(ctx context.Context, id uuid.UUID) (OrderComm
 		&i.ID,
 		&i.Type,
 		&i.OrderID,
-		&i.Place,
+		&i.OrderDetails,
 	)
 	return i, err
 }

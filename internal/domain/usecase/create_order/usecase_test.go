@@ -66,14 +66,14 @@ func TestUseCase_Execute_HappyPath(t *testing.T) {
 	orderRepo.EXPECT().
 		CreateOrderCommand(mock.Anything, mock.MatchedBy(func(command entity.OrderCommand) bool {
 			return command.ID != uuid.Nil &&
-				command.Type == entity.OrderCommandPlace &&
+				command.Type == entity.OrderCommandCreate &&
 				command.OrderID != uuid.Nil &&
-				command.Place != nil &&
-				command.Place.UserID == validUUID &&
-				command.Place.PairID == validMarketPairID &&
-				command.Place.Side == entity.BuySide &&
-				command.Place.PricePerUnit == validPricePerUnit &&
-				command.Place.Quantity == validQuantityOrdered
+				command.OrderDetails != nil &&
+				command.OrderDetails.UserID == validUUID &&
+				command.OrderDetails.PairID == validMarketPairID &&
+				command.OrderDetails.Side == entity.BuySide &&
+				command.OrderDetails.PricePerUnit == validPricePerUnit &&
+				command.OrderDetails.Quantity == validQuantityOrdered
 		})).
 		Run(func(_ context.Context, command entity.OrderCommand) {
 			loggedCommandID = command.ID

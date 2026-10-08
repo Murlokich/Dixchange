@@ -15,7 +15,7 @@ import (
 type OrderCommandType string
 
 const (
-	OrderCommandTypePlace  OrderCommandType = "place"
+	OrderCommandTypeCreate OrderCommandType = "create"
 	OrderCommandTypeCancel OrderCommandType = "cancel"
 )
 
@@ -97,10 +97,10 @@ func (ns NullOrderSide) Value() (driver.Value, error) {
 }
 
 type OrderCommandLogUsdKcn struct {
-	ID      uuid.UUID
-	Type    OrderCommandType
-	OrderID uuid.UUID
-	Place   []byte
+	ID           uuid.UUID
+	Type         OrderCommandType
+	OrderID      uuid.UUID
+	OrderDetails []byte
 }
 
 type OrderOrder struct {

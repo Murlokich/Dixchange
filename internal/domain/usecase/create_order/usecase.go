@@ -68,12 +68,12 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	}
 
 	// The order reaches the orders only once the engine has placed it: until then it is
-	// a place command in the command log, with its funds already reserved.
+	// a create command in the command log, with its funds already reserved.
 	commandID, err := uuid.NewV7()
 	if err != nil {
 		return Output{}, errors.Wrap(err, "gen command id")
 	}
-	command := entity.NewPlaceOrderCommand(commandID, order)
+	command := entity.NewCreateOrderCommand(commandID, order)
 
 	fn := func(ctx context.Context) error {
 		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, debitAmount); err != nil {

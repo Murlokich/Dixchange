@@ -108,9 +108,9 @@ func (s *SettlementService) settlePlacement(ctx context.Context, event eventbus.
 		if err != nil {
 			return pkgerrors.Wrap(err, "order repo take order command")
 		}
-		order, err := command.PlacedOrder()
+		order, err := command.CreatedOrder()
 		if err != nil {
-			return pkgerrors.Wrap(err, "order command placed order")
+			return pkgerrors.Wrap(err, "order command created order")
 		}
 		if err = s.orderRepo.CreateOrder(ctx, order); err != nil {
 			return pkgerrors.Wrap(err, "order repo create order")

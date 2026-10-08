@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -10,6 +12,14 @@ type ValidationError struct {
 
 func (v ValidationError) Error() string {
 	return v.Err.Error()
+}
+
+type InvalidCommandType struct {
+	CommandType string
+}
+
+func (ict InvalidCommandType) Error() string {
+	return fmt.Sprintf("command has invalid type: %s", ict.CommandType)
 }
 
 var (

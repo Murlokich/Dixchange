@@ -8,36 +8,37 @@ import (
 type OrderCommandType string
 
 const (
-	OrderCommandPlace  OrderCommandType = "place"
+	OrderCommandCreate OrderCommandType = "create"
 	OrderCommandCancel OrderCommandType = "cancel"
 )
 
 // OrderCommand is a request accepted for the matching engine whose effect hasn't been
-// applied to the orders yet. Place is set only for a place command; a cancel command
-// only names the order to cancel.
+// applied to the orders yet. OrderDetails is set only for a create command; a cancel
+// command only names the order to cancel.
 type OrderCommand struct {
-	ID      uuid.UUID
-	Type    OrderCommandType
-	OrderID uuid.UUID
-	Place   *PlaceOrderDetails
+	ID           uuid.UUID
+	Type         OrderCommandType
+	OrderID      uuid.UUID
+	OrderDetails *OrderDetails
 }
 
-// PlaceOrderDetails is the order a place command creates, apart from what OrderCommand
-// already carries.
-type PlaceOrderDetails struct {
-	UserID       uuid.UUID
-	PairID       int
-	Side         string
-	PricePerUnit int64
-	Quantity     int64
+// OrderDetails is the order a create command creates, apart from what OrderCommand
+// already carries. It is stored in the command log as JSON: renaming a JSON key breaks
+// reading the commands already stored.
+type OrderDetails struct {
+	UserID       uuid.UUID `json:"user_id"`
+	PairID       int       `json:"pair_id"`
+	Side         string    `json:"side"`
+	PricePerUnit int64     `json:"price"`
+	Quantity     int64     `json:"quantity"`
 }
 
-func NewPlaceOrderCommand(id uuid.UUID, order Order) OrderCommand {
+func NewCreateOrderCommand(id uuid.UUID, order Order) OrderCommand {
 	return OrderCommand{
 		ID:      id,
-		Type:    OrderCommandPlace,
+		Type:    OrderCommandCreate,
 		OrderID: order.ID,
-		Place: &PlaceOrderDetails{
+		OrderDetails: &OrderDetails{
 			UserID:       order.UserID,
 			PairID:       order.MarketPair.ID,
 			Side:         order.Side,
@@ -55,19 +56,19 @@ func NewCancelOrderCommand(id, orderID uuid.UUID) OrderCommand {
 	}
 }
 
-// PlacedOrder returns the order a place command creates, as it is before any fill. The
+// CreatedOrder returns the order a create command creates, as it is before any fill. The
 // order carries only the market pair ID; the caller resolves the rest of the pair.
-func (c *OrderCommand) PlacedOrder() (Order, error) {
-	if c.Type != OrderCommandPlace || c.Place == nil {
-		return Order{}, errors.Errorf("order command %s is %s, not place", c.ID, c.Type)
+func (c *OrderCommand) CreatedOrder() (Order, error) {
+	if c.Type != OrderCommandCreate || c.OrderDetails == nil {
+		return Order{}, errors.Errorf("order command %s is %s, not create", c.ID, c.Type)
 	}
 	return Order{
 		ID:              c.OrderID,
-		UserID:          c.Place.UserID,
-		MarketPair:      Pair{ID: c.Place.PairID},
-		Side:            c.Place.Side,
-		QuantityOrdered: c.Place.Quantity,
-		PricePerUnit:    c.Place.PricePerUnit,
+		UserID:          c.OrderDetails.UserID,
+		MarketPair:      Pair{ID: c.OrderDetails.PairID},
+		Side:            c.OrderDetails.Side,
+		QuantityOrdered: c.OrderDetails.Quantity,
+		PricePerUnit:    c.OrderDetails.PricePerUnit,
 		Status:          StatusOpen,
 	}, nil
 }
