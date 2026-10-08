@@ -56,8 +56,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	}
 
 	if err = u.commandBus.SendCancelOrder(ctx, commandID, input.OrderID); err != nil {
-		// TODO(recovery): the command is in the command log but never reached the book.
-		// A reload of the engine from the orders and the command log would apply it.
+		// TODO: introduce mechanism to reject request if engine is overloaded
 		return Output{}, errors.Wrap(err, "command bus send cancel order")
 	}
 

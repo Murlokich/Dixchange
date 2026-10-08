@@ -90,10 +90,7 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	}
 
 	if err = u.commandBus.SendPlaceOrder(ctx, commandID, order); err != nil {
-		// TODO(recovery): the command is in the command log with its funds reserved, but
-		// never reached the book. A reload of the engine from the orders and the command
-		// log would place it. See "Overload rejection happens after the commit" in
-		// CLAUDE.md for why this isn't compensated here.
+		// TODO: introduce mechanism to reject request if engine is overloaded
 		return Output{}, errors.Wrap(err, "command bus send place order")
 	}
 

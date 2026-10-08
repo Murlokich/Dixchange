@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -43,6 +45,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -88,34 +91,48 @@ func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pgxPool, nil
 }
 
-//nolint:funlen // for main length is accepted; mainly consists of initializations
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+// logError logs err together with the fields attached to it, if any.
+func logError(log pkg.Logger, err error) {
+	var errWithFields pkg.ErrorWithFields
+	if errors.As(err, &errWithFields) {
+		log = log.WithFields(errWithFields.Fields)
+	}
+	log.Error(err)
+}
 
+func main() {
 	logrusLogger := logrus.New()
 	logrusLogger.SetFormatter(&logrus.JSONFormatter{})
 	log := pkg.NewLogrusAdapter(logrusLogger)
 
+	// os.Exit skips deferred calls, so everything that needs cleanup lives in run.
+	if err := run(log); err != nil {
+		logError(log, err)
+		os.Exit(1)
+	}
+	log.Infoln("server exited cleanly")
+}
+
+//nolint:funlen // for run length is accepted; mainly consists of initializations
+func run(log pkg.Logger) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	var cfg config.Config
 	if err := envconfig.Process("", &cfg); err != nil {
-		log.Errorf("process config: %v", err)
-		return
+		return fmt.Errorf("process config: %w", err)
 	}
 	if err := cfg.Validate(); err != nil {
-		log.Errorf("validate config: %v", err)
-		return
+		return fmt.Errorf("validate config: %w", err)
 	}
 
 	if err := runMigrations(&cfg.DBConfig); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		log.Errorf("run migrations: %v", err)
-		return
+		return fmt.Errorf("run migrations: %w", err)
 	}
 
 	postgresPool, err := setupPostgres(ctx, cfg.DBConfig.URL)
 	if err != nil {
-		log.Errorf("connect to db: %v", err)
-		return
+		return fmt.Errorf("connect to db: %w", err)
 	}
 	defer postgresPool.Close()
 
@@ -126,21 +143,18 @@ func main() {
 	tradeRepo := tradeSQL.NewRepository(postgresPool, pkg.GetDB)
 	marketCache, err := service.NewDBCache(ctx, marketRepo)
 	if err != nil {
-		log.Errorf("create market db cache: %v", err)
-		return
+		return fmt.Errorf("create market db cache: %w", err)
 	}
 	pwdHasher := argon2.NewArgon2(&cfg.Argon2Config)
 	txManager := pkg.NewTXManager(postgresPool)
 	jwtManager, err := jwt.NewManager(&cfg.JWTConfig)
 	if err != nil {
-		log.Errorf("create jwt manager: %v", err)
-		return
+		return fmt.Errorf("create jwt manager: %w", err)
 	}
 	converter := service.NewConverter()
 	defaultPair, ok := marketCache.GetPair(defaultMarketPairID)
 	if !ok {
-		log.Errorf("market cache pair %d doesn't exist", defaultMarketPairID)
-		return
+		return fmt.Errorf("market cache pair %d doesn't exist", defaultMarketPairID)
 	}
 	orderBook := orderbook.NewBook(&cfg.OrderBookConfig, defaultPair)
 	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
@@ -158,15 +172,17 @@ func main() {
 	)
 
 	// Start matching engine and settlement service before any traffic comes in
-	go func() {
-		if err := matchingEngine.LoadOrderBook(ctx); err != nil {
-			panic(err)
-		}
-		matchingEngine.Run(ctx)
-	}()
-	go func() {
-		settlementService.Run(ctx)
-	}()
+	if err := matchingEngine.LoadOrderBook(ctx); err != nil {
+		return fmt.Errorf("failed to load order book: %w", err)
+	}
+	// The first member to fail cancels gctx, which stops all the others.
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return errors.Wrap(matchingEngine.Run(gctx), "matching engine")
+	})
+	g.Go(func() error {
+		return errors.Wrap(settlementService.Run(gctx), "settlement service")
+	})
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
 	logUseCase := login.NewUseCase(userRepo, pwdHasher, jwtManager)
@@ -203,25 +219,29 @@ func main() {
 		Handler:           router,
 	}
 
-	go func() {
-		if err = srv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("server listen: %s\n", err)
+	g.Go(func() error {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			return errors.Wrap(err, "server listen")
 		}
-	}()
+		return nil
+	})
+	g.Go(func() error {
+		<-gctx.Done()
+		log.Infof("shutting down gracefully")
+		// Give active connections time to finish processing
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTime)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Errorf("server forced to shutdown: %v", err)
+			return errors.Wrap(err, "server shutdown")
+		}
+		return nil
+	})
 
-	// graceful shutdown
-	<-ctx.Done()
-
-	log.Infoln("shutting down gracefully")
-	// Give active connections 5 seconds to finish processing
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTime)
-	defer cancel()
-
-	if err = srv.Shutdown(shutdownCtx); err != nil {
-		log.Error("Server forced to shutdown: ", err)
+	// Wait returns the first error. On a signal every member returns Canceled, which is
+	// a clean shutdown; otherwise the first error is the failure that started the shutdown.
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		return err
 	}
-
-	postgresPool.Close()
-
-	log.Infoln("Server exited cleanly")
+	return nil
 }

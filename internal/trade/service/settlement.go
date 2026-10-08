@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	eventbus "github.com/dixchange/Monolith/internal/matching_engine/event_bus"
@@ -54,16 +54,11 @@ type SettlementService struct {
 	logger     pkg.Logger
 }
 
-func (s *SettlementService) Run(ctx context.Context) {
+func (s *SettlementService) Run(ctx context.Context) error {
 	for {
 		event, err := s.eventBus.Consume(ctx)
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				// TODO: graceful shutdown
-				return
-			}
-			s.logger.Errorf("eventBus Consume: %v", err)
-			continue
+			return fmt.Errorf("event bus Consume: %w", err)
 		}
 
 		var commandID uuid.UUID
@@ -82,15 +77,10 @@ func (s *SettlementService) Run(ctx context.Context) {
 			continue
 		}
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				// TODO: graceful shutdown
-				return
+			return pkg.ErrorWithFields{
+				Err:    fmt.Errorf("process event: %v with error: %w", event, err),
+				Fields: map[string]any{"command_id": commandID},
 			}
-			// TODO(recovery): the engine has already applied this command to the book, so
-			// the book and the DB now diverge (a trade not settled, or a cancelled order
-			// still active with its funds reserved). Reload the engine from the orders and
-			// the command log instead of carrying on with the next event.
-			s.logger.WithField("command_id", commandID).Errorf("settle %T: %v", event, err)
 		}
 	}
 }

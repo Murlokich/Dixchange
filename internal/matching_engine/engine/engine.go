@@ -10,7 +10,6 @@ import (
 	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
 	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
-	pkgerrors "github.com/pkg/errors"
 )
 
 type OrderBook interface {
@@ -42,29 +41,15 @@ type MatchingEngine struct {
 	logger     pkg.Logger
 }
 
-func (m *MatchingEngine) Run(ctx context.Context) {
+func (m *MatchingEngine) Run(ctx context.Context) error {
 	for {
 		command, err := m.commandBus.Receive(ctx)
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				// TODO: graceful shutdown
-				return
-			}
-			m.logger.Errorf("commandBus Receive: %v", err)
-			continue
+			return errors.Wrap(err, "commandBus Receive")
 		}
 
-		orderID, err := m.processCommand(ctx, command)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				// TODO: graceful shutdown
-				return
-			}
-			// TODO(recovery): the command stays in the command log, but the book may
-			// already have applied it (publish failed) or be corrupted (book error), so
-			// the book and the DB diverge. Reload the engine from the orders and the
-			// command log instead of carrying on.
-			m.logger.WithField("order_id", orderID).Errorf("handle %T: %v", command, err)
+		if err = m.processCommand(ctx, command); err != nil {
+			return errors.Wrap(err, "processCommand")
 		}
 	}
 }
@@ -90,11 +75,11 @@ func NewMatchingEngine(
 func (m *MatchingEngine) placeOrder(ctx context.Context, commandID uuid.UUID, order orderbook.Order) error {
 	trades, err := m.book.AddOrder(&order)
 	if err != nil {
-		return pkgerrors.Wrap(err, "book add order")
+		return errors.Wrap(err, "book add order")
 	}
 	entityTrades := orderbookToEntityTrades(trades, m.book.Pair())
 	if err = m.eventBus.PublishOrderPlaced(ctx, commandID, entityTrades); err != nil {
-		return pkgerrors.Wrap(err, "eventBus PublishOrderPlaced")
+		return errors.Wrap(err, "eventBus PublishOrderPlaced")
 	}
 	return nil
 }
@@ -102,26 +87,30 @@ func (m *MatchingEngine) placeOrder(ctx context.Context, commandID uuid.UUID, or
 // cancelOrder removes the order from the book and publishes the cancellation, so the
 // funds still reserved for it get released.
 func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error {
+	logFields := map[string]any{"commandID": commandID, "orderID": orderID}
 	cancelled, err := m.book.CancelOrder(orderID)
 	if err != nil {
-		// TODO(recovery): an error here means the book's internal state is broken (a list node that
-		// isn't an order, a price level that can't be deleted), not a bad request. Decide
-		// whether the engine should halt instead of carrying on with a corrupted book.
-		return pkgerrors.Wrap(err, "book cancel order")
+		return pkg.ErrorWithFields{
+			Err:    errors.Wrap(err, "book cancel order"),
+			Fields: logFields,
+		}
 	}
 	if !cancelled {
-		// Normal outcome: the order was filled, or already cancelled, before this command
-		// reached the engine. There is nothing to release, but the command is published
-		// anyway so settlement removes it from the command log.
-		m.logger.WithField("order_id", orderID).Infof("order to cancel is not in the book")
+		m.logger.WithFields(logFields).Infof("order to cancel is not in the book")
 		if err = m.eventBus.PublishCancelRejected(ctx, commandID); err != nil {
-			return pkgerrors.Wrap(err, "eventBus PublishCancelRejected")
+			return pkg.ErrorWithFields{
+				Err:    errors.Wrap(err, "eventBus PublishCancelRejected"),
+				Fields: logFields,
+			}
 		}
 		return nil
 	}
 
 	if err = m.eventBus.PublishOrderCancelled(ctx, commandID); err != nil {
-		return pkgerrors.Wrap(err, "eventBus PublishOrderCancelled")
+		return pkg.ErrorWithFields{
+			Err:    errors.Wrap(err, "eventBus PublishOrderCancelled"),
+			Fields: logFields,
+		}
 	}
 	return nil
 }
@@ -167,9 +156,8 @@ func (m *MatchingEngine) applyRequestLog(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "logEntryToBusCommand")
 		}
-		orderID, err := m.processCommand(ctx, cmd)
+		err = m.processCommand(ctx, cmd)
 		if err != nil {
-			m.logger.WithField("order_id", orderID).Errorf("processCommand %v: %v", cmd, err)
 			return errors.Wrap(err, "processCommand")
 		}
 	}
@@ -177,7 +165,7 @@ func (m *MatchingEngine) applyRequestLog(ctx context.Context) error {
 }
 
 // processCommand returns orderID for logging purposes
-func (m *MatchingEngine) processCommand(ctx context.Context, command commandbus.Command) (uuid.UUID, error) {
+func (m *MatchingEngine) processCommand(ctx context.Context, command commandbus.Command) error {
 	var orderID uuid.UUID
 	var err error
 	switch c := command.(type) {
@@ -191,9 +179,12 @@ func (m *MatchingEngine) processCommand(ctx context.Context, command commandbus.
 		err = errors.Errorf("unknown command type %T", command)
 	}
 	if err != nil {
-		return uuid.Nil, err
+		return pkg.ErrorWithFields{
+			Err:    err,
+			Fields: map[string]any{"orderID": orderID},
+		}
 	}
-	return orderID, nil
+	return nil
 }
 
 // The book matches a single pair, so the pair is stamped onto every trade it produced
@@ -213,6 +204,7 @@ func orderbookToEntityTrades(trades []orderbook.Trade, pair entity.Pair) []entit
 }
 
 func logEntryToBusCommand(cmd entity.OrderCommand) (commandbus.Command, error) {
+	logFields := map[string]any{"commandID": cmd.ID, "orderID": cmd.OrderID}
 	switch cmd.Type {
 	case entity.OrderCommandCreate:
 		order, err := cmd.CreatedOrder()
@@ -230,6 +222,9 @@ func logEntryToBusCommand(cmd entity.OrderCommand) (commandbus.Command, error) {
 			OrderID:   cmd.OrderID,
 		}, nil
 	default:
-		return nil, entity.InvalidCommandType{CommandType: string(cmd.Type)}
+		return nil, pkg.ErrorWithFields{
+			Err:    entity.InvalidCommandType{CommandType: string(cmd.Type)},
+			Fields: logFields,
+		}
 	}
 }
