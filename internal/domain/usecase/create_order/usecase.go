@@ -2,8 +2,10 @@ package createorder
 
 import (
 	"context"
+	stdErrors "errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -35,7 +37,7 @@ type Converter interface {
 }
 
 type CommandBus interface {
-	SendPlaceOrder(ctx context.Context, commandID uuid.UUID, entityOrder entity.Order) error
+	GetWriteAccess(ctx context.Context) (pkg.AccessTicket, error)
 }
 
 type UseCase struct {
@@ -47,8 +49,9 @@ type UseCase struct {
 	commandBus CommandBus
 }
 
-func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
-	if err := input.Validate(ctx); err != nil {
+//nolint:nonamedreturns // the deferred release joins its error into err
+func (u *UseCase) Execute(ctx context.Context, input Input) (o Output, err error) {
+	if err = input.Validate(ctx); err != nil {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
 
@@ -75,6 +78,16 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 	}
 	command := entity.NewCreateOrderCommand(commandID, order)
 
+	ticket, err := u.commandBus.GetWriteAccess(ctx)
+	if err != nil {
+		return Output{}, errors.Wrap(err, "commandBus GetWriteAccess")
+	}
+	defer func() {
+		if ticketErr := ticket.ReleaseWriteAccess(); ticketErr != nil {
+			err = stdErrors.Join(err, ticketErr)
+		}
+	}()
+
 	fn := func(ctx context.Context) error {
 		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, debitAmount); err != nil {
 			return errors.Wrap(err, "wallet repo reserve funds")
@@ -89,9 +102,8 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "tx manager with tx")
 	}
 
-	if err = u.commandBus.SendPlaceOrder(ctx, commandID, order); err != nil {
-		// TODO: introduce mechanism to reject request if engine is overloaded
-		return Output{}, errors.Wrap(err, "command bus send place order")
+	if err = ticket.SendPlaceOrder(commandID, order); err != nil {
+		return Output{}, errors.Wrap(err, "ticket SendPlaceOrder")
 	}
 
 	return Output{}, nil

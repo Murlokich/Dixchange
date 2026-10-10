@@ -49,17 +49,32 @@ func TestCommandBus_MultipleSendersPreserveHandoffOrder(t *testing.T) {
 
 	order1, order2 := newTestOrder(), newTestOrder()
 
+	placeOrder := func(order entity.Order) error {
+		ticket, err := bus.GetWriteAccess(context.Background())
+		if err != nil {
+			return err
+		}
+		return ticket.SendPlaceOrder(uuid.New(), order)
+	}
+	cancelOrder := func(orderID uuid.UUID) error {
+		ticket, err := bus.GetWriteAccess(context.Background())
+		if err != nil {
+			return err
+		}
+		return ticket.SendCancelOrder(uuid.New(), orderID)
+	}
+
 	baton := make(chan struct{})
 	done := make(chan error, 2)
 
 	go func() {
-		if err := bus.SendPlaceOrder(context.Background(), uuid.New(), order1); err != nil {
+		if err := placeOrder(order1); err != nil {
 			done <- err
 			return
 		}
 		baton <- struct{}{} // let s2 place order2
 		<-baton             // wait for order2 to be placed
-		if err := bus.SendCancelOrder(context.Background(), uuid.New(), order1.ID); err != nil {
+		if err := cancelOrder(order1.ID); err != nil {
 			done <- err
 			return
 		}
@@ -69,13 +84,13 @@ func TestCommandBus_MultipleSendersPreserveHandoffOrder(t *testing.T) {
 
 	go func() {
 		<-baton // wait for order1 to be placed
-		if err := bus.SendPlaceOrder(context.Background(), uuid.New(), order2); err != nil {
+		if err := placeOrder(order2); err != nil {
 			done <- err
 			return
 		}
 		baton <- struct{}{} // let s1 cancel order1
 		<-baton             // wait for order1 to be cancelled
-		done <- bus.SendCancelOrder(context.Background(), uuid.New(), order2.ID)
+		done <- cancelOrder(order2.ID)
 	}()
 
 	require.NoError(t, <-done)
@@ -96,59 +111,114 @@ func TestCommandBus_MultipleSendersPreserveHandoffOrder(t *testing.T) {
 	}
 }
 
-// Once the queue's buffer is full and nothing drains it, a send must not
-// block forever: it should give up after sendTimeout and report that timeout
-// as the error, without ever writing the second command into the queue.
-func TestCommandBus_Send_RespectsSendTimeout(t *testing.T) {
+// Once every slot is taken, GetWriteAccess must not block forever: it gives up after
+// sendTimeout and reports overload. Receiving the command frees its slot.
+func TestCommandBus_GetWriteAccess_RespectsSendTimeout(t *testing.T) {
 	const sendTimeout = 30 * time.Millisecond
 	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: sendTimeout})
 
 	first := newTestOrder()
-	require.NoError(t, bus.SendPlaceOrder(context.Background(), uuid.New(), first))
+	ticket, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, ticket.SendPlaceOrder(uuid.New(), first))
 
 	start := time.Now()
-	err := bus.SendCancelOrder(context.Background(), uuid.New(), first.ID)
+	_, err = bus.GetWriteAccess(context.Background())
 	elapsed := time.Since(start)
 
-	require.Error(t, err)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, entity.ErrCommandBusOverloaded)
 	assert.GreaterOrEqual(t, elapsed, sendTimeout)
 
-	// The only command that made it into the queue is the first one.
-	receiveCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-	got, err := bus.Receive(receiveCtx)
+	got, err := bus.Receive(context.Background())
 	require.NoError(t, err)
-	require.IsType(t, PlaceOrder{}, got)
 	assert.Equal(t, first.ID, commandOrderID(t, got))
 
-	receiveCtx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel2()
-	_, err = bus.Receive(receiveCtx2)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	_, err = bus.GetWriteAccess(context.Background())
+	require.NoError(t, err, "receiving the command must free its slot")
 }
 
-// A send blocks on a full queue; cancelling the caller's context from
-// outside must unblock it immediately with context.Canceled, independent of
-// the (much longer) send timeout.
-func TestCommandBus_Send_ReturnsErrorWhenContextCancelledExternally(t *testing.T) {
-	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 0, SendTimeout: time.Minute})
+// GetWriteAccess blocks while every slot is taken; cancelling the caller's context from
+// outside must unblock it immediately with context.Canceled, independent of the (much
+// longer) send timeout.
+func TestCommandBus_GetWriteAccess_ReturnsErrorWhenContextCancelledExternally(t *testing.T) {
+	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: time.Minute})
+	_, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- bus.SendPlaceOrder(ctx, uuid.New(), newTestOrder())
+		_, accessErr := bus.GetWriteAccess(ctx)
+		errCh <- accessErr
 	}()
 
-	time.Sleep(20 * time.Millisecond) // let the send reach the select
+	time.Sleep(20 * time.Millisecond) // let GetWriteAccess reach the select
 	cancel()
 
 	select {
-	case err := <-errCh:
+	case err = <-errCh:
 		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(testTimeout):
-		t.Fatal("SendPlaceOrder did not return after context was cancelled")
+		t.Fatal("GetWriteAccess did not return after context was cancelled")
 	}
+}
+
+// Releasing an unsent ticket gives its slot back; releasing it again does nothing, so it
+// can't free a slot held by someone else.
+func TestAccessTicket_ReleaseFreesSlotOnce(t *testing.T) {
+	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: 30 * time.Millisecond})
+
+	first, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, first.ReleaseWriteAccess())
+
+	second, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err, "the released slot must be free again")
+
+	require.NoError(t, first.ReleaseWriteAccess())
+	_, err = bus.GetWriteAccess(context.Background())
+	require.ErrorIs(t, err, entity.ErrCommandBusOverloaded, "a second release must not free the second ticket's slot")
+
+	require.NoError(t, second.ReleaseWriteAccess())
+}
+
+// A ticket sends at most one command, and once it has sent, its slot belongs to the
+// command: a release does nothing and only Receive frees the slot.
+func TestAccessTicket_SendsOnce(t *testing.T) {
+	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: 30 * time.Millisecond})
+
+	ticket, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, ticket.SendPlaceOrder(uuid.New(), newTestOrder()))
+
+	require.ErrorIs(t, ticket.SendCancelOrder(uuid.New(), uuid.New()), ErrTicketUsed)
+	require.NoError(t, ticket.ReleaseWriteAccess())
+
+	_, err = bus.GetWriteAccess(context.Background())
+	require.ErrorIs(t, err, entity.ErrCommandBusOverloaded, "the slot must stay taken until Receive")
+}
+
+// A ticket whose send finds the queue full reports the broken invariant and keeps its
+// slot, so the release still gives it back.
+func TestAccessTicket_SendReportsFullQueue(t *testing.T) {
+	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: testTimeout})
+
+	ticket, err := bus.GetWriteAccess(context.Background())
+	require.NoError(t, err)
+	bus.commandQueue <- PlaceOrder{} // a command that bypassed the slots
+
+	require.ErrorIs(t, ticket.SendPlaceOrder(uuid.New(), newTestOrder()), ErrAccessQueueAsync)
+	require.NoError(t, ticket.ReleaseWriteAccess())
+}
+
+// A command without a slot means the slots and the queue diverged: Receive reports it
+// instead of blocking, so the engine stops.
+func TestCommandBus_Receive_ReportsCommandWithoutSlot(t *testing.T) {
+	bus := NewCommandBus(&config.CommandBusConfig{BufferSize: 1, SendTimeout: testTimeout})
+	bus.commandQueue <- PlaceOrder{}
+
+	_, err := bus.Receive(context.Background())
+	require.ErrorIs(t, err, ErrAccessQueueAsync)
 }
 
 // Receive blocks on an empty queue; cancelling the caller's context

@@ -2,8 +2,10 @@ package cancelorder
 
 import (
 	"context"
+	stdErrors "errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
@@ -14,7 +16,7 @@ type OrderRepository interface {
 }
 
 type CommandBus interface {
-	SendCancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error
+	GetWriteAccess(ctx context.Context) (pkg.AccessTicket, error)
 }
 
 type UseCase struct {
@@ -30,7 +32,7 @@ type UseCase struct {
 // can't cancel, and entity.ErrOrderNotCancellable for their own order that is no longer
 // active. The order status is checked only after ownership, so nothing about another
 // user's order is revealed.
-func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
+func (u *UseCase) Execute(ctx context.Context, input Input) (o Output, err error) {
 	if err := input.Validate(ctx); err != nil {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
@@ -46,6 +48,16 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrapf(entity.ErrOrderNotCancellable, "order %s status %s", input.OrderID, info.Status)
 	}
 
+	ticket, err := u.commandBus.GetWriteAccess(ctx)
+	if err != nil {
+		return Output{}, errors.Wrap(err, "commandBus GetWriteAccess")
+	}
+	defer func() {
+		if ticketErr := ticket.ReleaseWriteAccess(); ticketErr != nil {
+			err = stdErrors.Join(err, ticketErr)
+		}
+	}()
+
 	commandID, err := uuid.NewV7()
 	if err != nil {
 		return Output{}, errors.Wrap(err, "gen command id")
@@ -55,9 +67,8 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "order repo create order command")
 	}
 
-	if err = u.commandBus.SendCancelOrder(ctx, commandID, input.OrderID); err != nil {
-		// TODO: introduce mechanism to reject request if engine is overloaded
-		return Output{}, errors.Wrap(err, "command bus send cancel order")
+	if err = ticket.SendCancelOrder(commandID, input.OrderID); err != nil {
+		return Output{}, errors.Wrap(err, "ticket SendCancelOrder")
 	}
 
 	return Output{}, nil

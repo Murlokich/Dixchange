@@ -6,6 +6,7 @@ import (
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
+	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
@@ -18,6 +19,42 @@ var (
 	otherID = uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3e34")
 	orderID = uuid.MustParse("019f7f2c-0caa-70ab-b1ec-414f744c3e35")
 )
+
+// fakeTicket records what the usecase does with its access ticket. mockery only covers
+// the usecase packages, and the ticket interface lives in pkg.
+type fakeTicket struct {
+	sendErr    error
+	releaseErr error
+
+	sends         int
+	releases      int
+	sentCommandID uuid.UUID
+	sentOrderID   uuid.UUID
+}
+
+var _ pkg.AccessTicket = (*fakeTicket)(nil)
+
+func (f *fakeTicket) SendPlaceOrder(uuid.UUID, entity.Order) error {
+	return errors.New("cancel order must not send a place")
+}
+
+func (f *fakeTicket) SendCancelOrder(commandID, orderID uuid.UUID) error {
+	f.sends++
+	f.sentCommandID = commandID
+	f.sentOrderID = orderID
+	return f.sendErr
+}
+
+func (f *fakeTicket) ReleaseWriteAccess() error {
+	f.releases++
+	return f.releaseErr
+}
+
+// expectActiveOwnedOrder makes the order pass the ownership and status checks.
+func expectActiveOwnedOrder(orderRepo *cancelorder.MockOrderRepository) {
+	orderRepo.EXPECT().GetOrderCancelInfo(mock.Anything, orderID).
+		Return(entity.OrderCancelInfo{UserID: userID, Status: entity.StatusOpen}, nil).Once()
+}
 
 // isCancelCommand matches the cancel command the use case logs for orderID.
 func isCancelCommand(command entity.OrderCommand) bool {
@@ -40,16 +77,13 @@ func TestUseCase_Execute_SendsCancelForActiveOwnedOrder(t *testing.T) {
 			orderRepo.EXPECT().GetOrderCancelInfo(mock.Anything, orderID).
 				Return(entity.OrderCancelInfo{UserID: userID, Status: status}, nil).Once()
 
-			// the same command ID is logged and sent, so settlement can find the command
+			ticket := &fakeTicket{}
+			commandBus.EXPECT().GetWriteAccess(mock.Anything).Return(ticket, nil).Once()
+
 			var loggedCommandID uuid.UUID
 			orderRepo.EXPECT().CreateOrderCommand(mock.Anything, mock.MatchedBy(isCancelCommand)).
 				Run(func(_ context.Context, command entity.OrderCommand) {
 					loggedCommandID = command.ID
-				}).
-				Return(nil).Once()
-			commandBus.EXPECT().SendCancelOrder(mock.Anything, mock.Anything, orderID).
-				Run(func(_ context.Context, commandID, _ uuid.UUID) {
-					require.Equal(t, loggedCommandID, commandID)
 				}).
 				Return(nil).Once()
 
@@ -57,6 +91,12 @@ func TestUseCase_Execute_SendsCancelForActiveOwnedOrder(t *testing.T) {
 			_, err := uc.Execute(t.Context(), cancelorder.Input{UserID: userID, OrderID: orderID})
 
 			require.NoError(t, err)
+			// the same command ID is logged and sent, so settlement can find the command
+			require.Equal(t, 1, ticket.sends)
+			require.Equal(t, loggedCommandID, ticket.sentCommandID)
+			require.Equal(t, orderID, ticket.sentOrderID)
+			// the release is deferred unconditionally; the real ticket ignores it once sent
+			require.Equal(t, 1, ticket.releases)
 		})
 	}
 }
@@ -103,7 +143,7 @@ func TestUseCase_Execute_RejectsWithoutSending(t *testing.T) {
 			t.Parallel()
 
 			orderRepo := cancelorder.NewMockOrderRepository(t)
-			// no expectations: the cancel must not reach the engine
+			// no expectations: a rejected cancel takes no slot and doesn't reach the engine
 			commandBus := cancelorder.NewMockCommandBus(t)
 
 			orderRepo.EXPECT().GetOrderCancelInfo(mock.Anything, orderID).Return(tc.info, tc.repoErr).Once()
@@ -142,6 +182,23 @@ func TestUseCase_Execute_InvalidInput(t *testing.T) {
 	}
 }
 
+// An overloaded bus rejects the cancel before it is written to the command log.
+func TestUseCase_Execute_NoWriteAccess(t *testing.T) {
+	t.Parallel()
+
+	// no CreateOrderCommand expectation: the mock fails the test if the cancel is logged
+	orderRepo := cancelorder.NewMockOrderRepository(t)
+	commandBus := cancelorder.NewMockCommandBus(t)
+
+	expectActiveOwnedOrder(orderRepo)
+	commandBus.EXPECT().GetWriteAccess(mock.Anything).Return(nil, entity.ErrCommandBusOverloaded).Once()
+
+	uc := cancelorder.NewUseCase(orderRepo, commandBus)
+	_, err := uc.Execute(t.Context(), cancelorder.Input{UserID: userID, OrderID: orderID})
+
+	require.ErrorIs(t, err, entity.ErrCommandBusOverloaded)
+}
+
 func TestUseCase_Execute_SendFailure(t *testing.T) {
 	t.Parallel()
 
@@ -149,31 +206,57 @@ func TestUseCase_Execute_SendFailure(t *testing.T) {
 	commandBus := cancelorder.NewMockCommandBus(t)
 
 	sendErr := errors.New("queue full")
-	orderRepo.EXPECT().GetOrderCancelInfo(mock.Anything, orderID).
-		Return(entity.OrderCancelInfo{UserID: userID, Status: entity.StatusOpen}, nil).Once()
+	expectActiveOwnedOrder(orderRepo)
+	ticket := &fakeTicket{sendErr: sendErr}
+	commandBus.EXPECT().GetWriteAccess(mock.Anything).Return(ticket, nil).Once()
 	orderRepo.EXPECT().CreateOrderCommand(mock.Anything, mock.MatchedBy(isCancelCommand)).Return(nil).Once()
-	commandBus.EXPECT().SendCancelOrder(mock.Anything, mock.Anything, orderID).Return(sendErr).Once()
 
 	uc := cancelorder.NewUseCase(orderRepo, commandBus)
 	_, err := uc.Execute(t.Context(), cancelorder.Input{UserID: userID, OrderID: orderID})
 
 	require.ErrorIs(t, err, sendErr)
+	require.Equal(t, 1, ticket.releases)
 }
 
+// A cancel that isn't in the command log must not reach the engine, and gives its slot
+// back.
 func TestUseCase_Execute_CommandLogFailure(t *testing.T) {
 	t.Parallel()
 
 	orderRepo := cancelorder.NewMockOrderRepository(t)
-	// no expectations: a cancel that isn't in the command log must not reach the engine
 	commandBus := cancelorder.NewMockCommandBus(t)
 
 	logErr := errors.New("db down")
-	orderRepo.EXPECT().GetOrderCancelInfo(mock.Anything, orderID).
-		Return(entity.OrderCancelInfo{UserID: userID, Status: entity.StatusOpen}, nil).Once()
+	expectActiveOwnedOrder(orderRepo)
+	ticket := &fakeTicket{}
+	commandBus.EXPECT().GetWriteAccess(mock.Anything).Return(ticket, nil).Once()
 	orderRepo.EXPECT().CreateOrderCommand(mock.Anything, mock.MatchedBy(isCancelCommand)).Return(logErr).Once()
 
 	uc := cancelorder.NewUseCase(orderRepo, commandBus)
 	_, err := uc.Execute(t.Context(), cancelorder.Input{UserID: userID, OrderID: orderID})
 
 	require.ErrorIs(t, err, logErr)
+	require.Equal(t, 0, ticket.sends)
+	require.Equal(t, 1, ticket.releases)
+}
+
+// A failed release is joined to the error that made the usecase release, so neither is
+// lost.
+func TestUseCase_Execute_ReleaseErrorIsJoined(t *testing.T) {
+	t.Parallel()
+
+	orderRepo := cancelorder.NewMockOrderRepository(t)
+	commandBus := cancelorder.NewMockCommandBus(t)
+
+	logErr := errors.New("db down")
+	releaseErr := errors.New("release failed")
+	expectActiveOwnedOrder(orderRepo)
+	commandBus.EXPECT().GetWriteAccess(mock.Anything).Return(&fakeTicket{releaseErr: releaseErr}, nil).Once()
+	orderRepo.EXPECT().CreateOrderCommand(mock.Anything, mock.MatchedBy(isCancelCommand)).Return(logErr).Once()
+
+	uc := cancelorder.NewUseCase(orderRepo, commandBus)
+	_, err := uc.Execute(t.Context(), cancelorder.Input{UserID: userID, OrderID: orderID})
+
+	require.ErrorIs(t, err, logErr)
+	require.ErrorIs(t, err, releaseErr)
 }

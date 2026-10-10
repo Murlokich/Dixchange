@@ -167,6 +167,11 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 			deps.Logger.Error(err.Error())
 			return
 		}
+		if errors.Is(err, entity.ErrCommandBusOverloaded) {
+			c.Status(http.StatusServiceUnavailable)
+			deps.Logger.Warnf("%v", err)
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: createOrderFailureResponse})
 		deps.Logger.Error(err.Error())
 		return
@@ -225,6 +230,11 @@ func cancelOrderHandler(c *gin.Context, deps *Dependencies) {
 		if errors.Is(err, entity.ErrOrderNotCancellable) {
 			c.JSON(http.StatusConflict, gin.H{errorField: cancelOrderNotCancellableResponse})
 			deps.Logger.Error(err.Error())
+			return
+		}
+		if errors.Is(err, entity.ErrCommandBusOverloaded) {
+			c.Status(http.StatusServiceUnavailable)
+			deps.Logger.Warnf("%v", err)
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: cancelOrderFailureResponse})
