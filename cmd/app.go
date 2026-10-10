@@ -171,12 +171,13 @@ func run(log pkg.Logger) error {
 		log,
 	)
 
-	// Start matching engine and settlement service before any traffic comes in
+	// Load OrderBook state before starting app
 	if err := matchingEngine.LoadOrderBook(ctx); err != nil {
 		return fmt.Errorf("failed to load order book: %w", err)
 	}
 	// The first member to fail cancels gctx, which stops all the others.
 	g, gctx := errgroup.WithContext(ctx)
+	// Start matching engine and settlement service before any traffic comes in
 	g.Go(func() error {
 		return errors.Wrap(matchingEngine.Run(gctx), "matching engine")
 	})
