@@ -12,6 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Log field keys.
+const (
+	logKeyCommandID = "command_id"
+	logKeyOrderID   = "order_id"
+)
+
 type OrderBook interface {
 	AddOrder(order *orderbook.Order) ([]orderbook.Trade, error)
 	CancelOrder(id uuid.UUID) (bool, error)
@@ -87,10 +93,10 @@ func (m *MatchingEngine) placeOrder(ctx context.Context, commandID uuid.UUID, or
 // cancelOrder removes the order from the book and publishes the cancellation, so the
 // funds still reserved for it get released.
 func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uuid.UUID) error {
-	logFields := map[string]any{"commandID": commandID, "orderID": orderID}
+	logFields := map[string]any{logKeyCommandID: commandID, logKeyOrderID: orderID}
 	cancelled, err := m.book.CancelOrder(orderID)
 	if err != nil {
-		return pkg.ErrorWithFields{
+		return pkg.FieldsError{
 			Err:    errors.Wrap(err, "book cancel order"),
 			Fields: logFields,
 		}
@@ -98,7 +104,7 @@ func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uui
 	if !cancelled {
 		m.logger.WithFields(logFields).Infof("order to cancel is not in the book")
 		if err = m.eventBus.PublishCancelRejected(ctx, commandID); err != nil {
-			return pkg.ErrorWithFields{
+			return pkg.FieldsError{
 				Err:    errors.Wrap(err, "eventBus PublishCancelRejected"),
 				Fields: logFields,
 			}
@@ -107,7 +113,7 @@ func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uui
 	}
 
 	if err = m.eventBus.PublishOrderCancelled(ctx, commandID); err != nil {
-		return pkg.ErrorWithFields{
+		return pkg.FieldsError{
 			Err:    errors.Wrap(err, "eventBus PublishOrderCancelled"),
 			Fields: logFields,
 		}
@@ -118,7 +124,7 @@ func (m *MatchingEngine) cancelOrder(ctx context.Context, commandID, orderID uui
 func (m *MatchingEngine) LoadOrderBook(ctx context.Context) error {
 	m.logger.Infof("order book loading has been started")
 	if err := m.loadOpenOrders(ctx); err != nil {
-		return errors.Wrap(err, "loaodOpenOrders")
+		return errors.Wrap(err, "loadOpenOrders")
 	}
 	m.logger.Infof("open orders have been loaded successfully")
 	if err := m.applyRequestLog(ctx); err != nil {
@@ -179,9 +185,9 @@ func (m *MatchingEngine) processCommand(ctx context.Context, command commandbus.
 		err = errors.Errorf("unknown command type %T", command)
 	}
 	if err != nil {
-		return pkg.ErrorWithFields{
+		return pkg.FieldsError{
 			Err:    err,
-			Fields: map[string]any{"orderID": orderID},
+			Fields: map[string]any{logKeyOrderID: orderID},
 		}
 	}
 	return nil
@@ -204,7 +210,7 @@ func orderbookToEntityTrades(trades []orderbook.Trade, pair entity.Pair) []entit
 }
 
 func logEntryToBusCommand(cmd entity.OrderCommand) (commandbus.Command, error) {
-	logFields := map[string]any{"commandID": cmd.ID, "orderID": cmd.OrderID}
+	logFields := map[string]any{logKeyCommandID: cmd.ID, logKeyOrderID: cmd.OrderID}
 	switch cmd.Type {
 	case entity.OrderCommandCreate:
 		order, err := cmd.CreatedOrder()
@@ -222,8 +228,8 @@ func logEntryToBusCommand(cmd entity.OrderCommand) (commandbus.Command, error) {
 			OrderID:   cmd.OrderID,
 		}, nil
 	default:
-		return nil, pkg.ErrorWithFields{
-			Err:    entity.InvalidCommandType{CommandType: string(cmd.Type)},
+		return nil, pkg.FieldsError{
+			Err:    entity.InvalidCommandTypeError{CommandType: string(cmd.Type)},
 			Fields: logFields,
 		}
 	}

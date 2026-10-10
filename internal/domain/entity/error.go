@@ -14,12 +14,12 @@ func (v ValidationError) Error() string {
 	return v.Err.Error()
 }
 
-type InvalidCommandType struct {
+type InvalidCommandTypeError struct {
 	CommandType string
 }
 
-func (ict InvalidCommandType) Error() string {
-	return fmt.Sprintf("command has invalid type: %s", ict.CommandType)
+func (e InvalidCommandTypeError) Error() string {
+	return fmt.Sprintf("command has invalid type: %s", e.CommandType)
 }
 
 var (

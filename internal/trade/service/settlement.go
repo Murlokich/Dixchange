@@ -77,7 +77,7 @@ func (s *SettlementService) Run(ctx context.Context) error {
 			continue
 		}
 		if err != nil {
-			return pkg.ErrorWithFields{
+			return pkg.FieldsError{
 				Err:    fmt.Errorf("process event: %v with error: %w", event, err),
 				Fields: map[string]any{"command_id": commandID},
 			}

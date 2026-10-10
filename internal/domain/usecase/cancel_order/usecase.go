@@ -32,8 +32,8 @@ type UseCase struct {
 // can't cancel, and entity.ErrOrderNotCancellable for their own order that is no longer
 // active. The order status is checked only after ownership, so nothing about another
 // user's order is revealed.
-func (u *UseCase) Execute(ctx context.Context, input Input) (o Output, err error) {
-	if err := input.Validate(ctx); err != nil {
+func (u *UseCase) Execute(ctx context.Context, input Input) (_ Output, err error) {
+	if err = input.Validate(ctx); err != nil {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
 

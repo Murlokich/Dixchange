@@ -26,7 +26,7 @@ type Manager struct {
 func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
-		return "", errors.Wrap(err, "gen jwt id")
+		return "", errors.Wrap(err, "uuid NewV7")
 	}
 
 	claims := jwt.RegisteredClaims{
@@ -40,7 +40,7 @@ func (m *Manager) IssueToken(userID uuid.UUID) (string, error) {
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(&m.privateKey)
 	if err != nil {
-		return "", errors.Wrap(err, "sign jwt token")
+		return "", errors.Wrap(err, "jwt NewWithClaims SignedString")
 	}
 	return token, nil
 }
@@ -54,7 +54,7 @@ func (m *Manager) ValidateToken(accessToken string) (*jwt.Token, error) {
 	}
 	token, err := parser.Parse(accessToken, getKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse token")
+		return nil, errors.Wrap(err, "parser Parse")
 	}
 	return token, nil
 }
@@ -62,19 +62,19 @@ func (m *Manager) ValidateToken(accessToken string) (*jwt.Token, error) {
 func NewManager(c *config.JWTConfig) (*Manager, error) {
 	rawPublicKey, err := base64.StdEncoding.DecodeString(c.PublicKeyB64)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "base64 decode public key")
 	}
 	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(rawPublicKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "jwt ParseRSAPublicKeyFromPEM")
 	}
 	rawPrivateKey, err := base64.StdEncoding.DecodeString(c.PrivateKeyB64)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "base64 decode private key")
 	}
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(rawPrivateKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "jwt ParseRSAPrivateKeyFromPEM")
 	}
 
 	return &Manager{

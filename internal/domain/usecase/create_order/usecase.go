@@ -49,8 +49,7 @@ type UseCase struct {
 	commandBus CommandBus
 }
 
-//nolint:nonamedreturns // the deferred release joins its error into err
-func (u *UseCase) Execute(ctx context.Context, input Input) (o Output, err error) {
+func (u *UseCase) Execute(ctx context.Context, input Input) (_ Output, err error) {
 	if err = input.Validate(ctx); err != nil {
 		return Output{}, errors.Wrap(err, "input validate")
 	}

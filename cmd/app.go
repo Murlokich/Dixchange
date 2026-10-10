@@ -93,9 +93,9 @@ func setupPostgres(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 // logError logs err together with the fields attached to it, if any.
 func logError(log pkg.Logger, err error) {
-	var errWithFields pkg.ErrorWithFields
-	if errors.As(err, &errWithFields) {
-		log = log.WithFields(errWithFields.Fields)
+	var fieldsErr pkg.FieldsError
+	if errors.As(err, &fieldsErr) {
+		log = log.WithFields(fieldsErr.Fields)
 	}
 	log.Error(err)
 }

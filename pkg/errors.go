@@ -1,14 +1,14 @@
 package pkg
 
-type ErrorWithFields struct {
+type FieldsError struct {
 	Fields map[string]any
 	Err    error
 }
 
-func (e ErrorWithFields) Error() string {
+func (e FieldsError) Error() string {
 	return e.Err.Error()
 }
 
-func (e ErrorWithFields) Unwrap() error {
+func (e FieldsError) Unwrap() error {
 	return e.Err
 }

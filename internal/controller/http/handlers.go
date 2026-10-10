@@ -212,33 +212,26 @@ func cancelOrderHandler(c *gin.Context, deps *Dependencies) {
 		OrderID: orderID,
 	})
 	if err != nil {
-		if errors.As(err, &entity.ValidationError{}) {
+		switch {
+		case errors.As(err, &entity.ValidationError{}):
 			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
 			deps.Logger.Error(err.Error())
-			return
-		}
-		if errors.Is(err, entity.ErrOrderNotOwned) {
+		case errors.Is(err, entity.ErrOrderNotOwned):
 			c.Status(http.StatusAccepted)
 			deps.Logger.Warnf("order ownership mismatch on cancel: %v", err)
-			return
-		}
-		if errors.Is(err, entity.ErrOrderNotFound) {
+		case errors.Is(err, entity.ErrOrderNotFound):
 			c.Status(http.StatusAccepted)
 			deps.Logger.Infof("cancel of order that doesn't exist: %v", err)
-			return
-		}
-		if errors.Is(err, entity.ErrOrderNotCancellable) {
+		case errors.Is(err, entity.ErrOrderNotCancellable):
 			c.JSON(http.StatusConflict, gin.H{errorField: cancelOrderNotCancellableResponse})
 			deps.Logger.Error(err.Error())
-			return
-		}
-		if errors.Is(err, entity.ErrCommandBusOverloaded) {
+		case errors.Is(err, entity.ErrCommandBusOverloaded):
 			c.Status(http.StatusServiceUnavailable)
 			deps.Logger.Warnf("%v", err)
-			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{errorField: cancelOrderFailureResponse})
+			deps.Logger.Error(err.Error())
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{errorField: cancelOrderFailureResponse})
-		deps.Logger.Error(err.Error())
 		return
 	}
 	c.Status(http.StatusAccepted)
