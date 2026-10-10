@@ -1,0 +1,12 @@
+.git
+.github
+.claude
+.vscode
+.idea
+
+# secrets: configuration comes from the environment at run time
+envs/.env
+
+*.out
+coverage.*
+cmd/__debug_bin*
