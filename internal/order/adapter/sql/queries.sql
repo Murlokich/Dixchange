@@ -15,3 +15,28 @@ WHERE id = sqlc.arg(order_id);
 
 -- name: GetUserOrdersByStatuses :many
 SELECT * FROM "order"."order" WHERE user_id = $1 AND status = ANY($2::text[]) ORDER BY created_at DESC;
+
+-- name: GetOrderCancelInfo :one
+SELECT user_id, status FROM "order"."order" WHERE id = $1;
+
+-- name: GetOrderForUpdate :one
+SELECT * FROM "order"."order" WHERE id = $1 FOR UPDATE;
+
+-- name: CancelOrder :execrows
+UPDATE "order"."order"
+SET status = 'cancelled',
+    last_updated_at = NOW()
+WHERE id = $1;
+
+-- name: CreateOrderCommand :exec
+INSERT INTO "order".command_log_usd_kcn (id, type, order_id, order_details)
+    VALUES ($1, $2, $3, $4);
+
+-- name: TakeOrderCommand :one
+DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING *;
+
+-- name: GetAllOpenOrders :many
+SELECT * FROM "order"."order" WHERE status IN ('open', 'partially_filled') ORDER BY created_at ASC;
+
+-- name: GetAllCommands :many
+SELECT * FROM "order".command_log_usd_kcn ORDER BY id ASC;

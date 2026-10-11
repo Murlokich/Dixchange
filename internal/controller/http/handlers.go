@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
@@ -25,6 +26,8 @@ const (
 	loginFailureResponse                   = "Login failed due to internal error"
 	createOrderFailureResponse             = "Order creation failed due to internal error"
 	createOrderInsufficientBalanceResponse = "Order creation faild due to insufficient balance"
+	cancelOrderFailureResponse             = "Order cancellation failed due to internal error"
+	cancelOrderNotCancellableResponse      = "Order is no longer active and can't be cancelled"
 	getMarketDataFailureResponse           = "Market data retrieval failed due to internal error"
 	getPairBalanceFailureResponse          = "Pair balance retrieval failed due to internal error"
 	getPairBalanceNotFoundResponse         = "Balance not found"
@@ -164,11 +167,74 @@ func createOrderHandler(c *gin.Context, deps *Dependencies) {
 			deps.Logger.Error(err.Error())
 			return
 		}
+		if errors.Is(err, entity.ErrCommandBusOverloaded) {
+			c.Status(http.StatusServiceUnavailable)
+			deps.Logger.Warnf("%v", err)
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{errorField: createOrderFailureResponse})
 		deps.Logger.Error(err.Error())
 		return
 	}
 	c.Status(http.StatusCreated)
+}
+
+// cancelOrderHandler answers 202 once the cancel request is handed to the matching
+// engine: the engine decides whether the order is still there to cancel.
+//
+// A cancel of an order that doesn't exist or belongs to another user gets the same 202,
+// so the requester learns nothing about other users' orders or that the attempt was
+// noticed. The request goes no further, it is only logged.
+func cancelOrderHandler(c *gin.Context, deps *Dependencies) {
+	var req CancelOrderRequest
+
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: err.Error()})
+		deps.Logger.Error(err.Error())
+		return
+	}
+	orderID, err := uuid.Parse(req.OrderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("parse order id: %v", err)
+		return
+	}
+
+	userID, err := GetUserIDFromCtx(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+		deps.Logger.Errorf("get user id from ctx: %v", err)
+		return
+	}
+
+	_, err = deps.CancelOrder.Execute(c, cancelorder.Input{
+		UserID:  userID,
+		OrderID: orderID,
+	})
+	if err != nil {
+		switch {
+		case errors.As(err, &entity.ValidationError{}):
+			c.JSON(http.StatusBadRequest, gin.H{errorField: invalidRequestParametersResponse})
+			deps.Logger.Error(err.Error())
+		case errors.Is(err, entity.ErrOrderNotOwned):
+			c.Status(http.StatusAccepted)
+			deps.Logger.Warnf("order ownership mismatch on cancel: %v", err)
+		case errors.Is(err, entity.ErrOrderNotFound):
+			c.Status(http.StatusAccepted)
+			deps.Logger.Infof("cancel of order that doesn't exist: %v", err)
+		case errors.Is(err, entity.ErrOrderNotCancellable):
+			c.JSON(http.StatusConflict, gin.H{errorField: cancelOrderNotCancellableResponse})
+			deps.Logger.Error(err.Error())
+		case errors.Is(err, entity.ErrCommandBusOverloaded):
+			c.Status(http.StatusServiceUnavailable)
+			deps.Logger.Warnf("%v", err)
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{errorField: cancelOrderFailureResponse})
+			deps.Logger.Error(err.Error())
+		}
+		return
+	}
+	c.Status(http.StatusAccepted)
 }
 
 func getMarketDataHandler(c *gin.Context, deps *Dependencies) {

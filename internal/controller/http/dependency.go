@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
@@ -29,6 +30,7 @@ type Dependencies struct {
 	Login          *login.UseCase
 	Deposit        *deposit.UseCase
 	CreateOrder    *createorder.UseCase
+	CancelOrder    *cancelorder.UseCase
 	GetMarketData  *getmarketdata.UseCase
 	GetPairBalance *getpairbalance.UseCase
 	GetOrders      *getorders.UseCase

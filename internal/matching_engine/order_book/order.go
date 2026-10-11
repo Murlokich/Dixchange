@@ -50,6 +50,6 @@ func NewOrderFromEntity(order entity.Order) Order {
 		OrderType:         LimitOrder,
 		Side:              order.Side,
 		Price:             order.PricePerUnit,
-		RemainingQuantity: order.QuantityOrdered,
+		RemainingQuantity: order.RemainingQuantity(),
 	}
 }

@@ -41,7 +41,7 @@ func TestOrder_GetDebitAsset(t *testing.T) {
 	}
 }
 
-func TestOrder_GetDebitAmount(t *testing.T) {
+func TestOrder_GetDebitOrderedAmount(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -96,7 +96,7 @@ func TestOrder_GetDebitAmount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			amount, err := tc.order.GetDebitAmount()
+			amount, err := tc.order.GetDebitOrderedAmount()
 			if tc.errContains != "" {
 				require.ErrorContains(t, err, tc.errContains)
 				require.Zero(t, amount)
@@ -106,6 +106,91 @@ func TestOrder_GetDebitAmount(t *testing.T) {
 			require.Equal(t, tc.want, amount)
 		})
 	}
+}
+
+func TestOrder_GetDebitRemainingAmount(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		order entity.Order
+		want  int64
+	}{
+		{
+			name: "buy debits notional of the unfilled part: 0.001 of 0.00123 BTC at 65000.50 USDT",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Side:            entity.BuySide,
+				QuantityOrdered: 123000,
+				QuantityFilled:  23000,
+				PricePerUnit:    6500050,
+			},
+			want: 6500050000,
+		},
+		{
+			name: "sell debits the unfilled quantity in base minor units",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Side:            entity.SellSide,
+				QuantityOrdered: 123000,
+				QuantityFilled:  23000,
+				PricePerUnit:    6500050,
+			},
+			want: 100000,
+		},
+		{
+			name: "unfilled order debits the ordered amount",
+			order: entity.Order{
+				MarketPair:      btcUsdt,
+				Side:            entity.BuySide,
+				QuantityOrdered: 123000,
+				PricePerUnit:    6500050,
+			},
+			want: 7995061500,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			amount, err := tc.order.GetDebitRemainingAmount()
+			require.NoError(t, err)
+			require.Equal(t, tc.want, amount)
+		})
+	}
+}
+
+// What a cancel releases plus what the fills consumed must add up to what was reserved,
+// otherwise funds are left locked in reserved forever.
+func TestOrder_DebitAmountsAddUp(t *testing.T) {
+	t.Parallel()
+
+	order := entity.Order{
+		MarketPair:      btcUsdt,
+		Side:            entity.BuySide,
+		QuantityOrdered: 123000,
+		QuantityFilled:  23000,
+		PricePerUnit:    6500050,
+	}
+
+	ordered, err := order.GetDebitOrderedAmount()
+	require.NoError(t, err)
+	remaining, err := order.GetDebitRemainingAmount()
+	require.NoError(t, err)
+	consumed, err := order.MarketPair.Notional(order.QuantityFilled, order.PricePerUnit)
+	require.NoError(t, err)
+
+	require.Equal(t, ordered, remaining+consumed)
+}
+
+func TestIsActiveOrderStatus(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, entity.IsActiveOrderStatus(entity.StatusOpen))
+	require.True(t, entity.IsActiveOrderStatus(entity.StatusPartiallyFilled))
+	require.False(t, entity.IsActiveOrderStatus(entity.StatusFilled))
+	require.False(t, entity.IsActiveOrderStatus(entity.StatusCancelled))
 }
 
 func TestOrder_GetCreditAsset(t *testing.T) {

@@ -2,15 +2,17 @@ package createorder
 
 import (
 	"context"
+	stdErrors "errors"
 
 	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/dixchange/Monolith/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 )
 
 type OrderRepository interface {
-	CreateOrder(ctx context.Context, order entity.Order) error
+	CreateOrderCommand(ctx context.Context, command entity.OrderCommand) error
 }
 
 type WalletRepository interface {
@@ -34,8 +36,8 @@ type Converter interface {
 	) (entity.Order, error)
 }
 
-type BookWriter interface {
-	InsertOrder(ctx context.Context, entityOrder entity.Order) error
+type CommandBus interface {
+	GetWriteAccess(ctx context.Context) (pkg.AccessTicket, error)
 }
 
 type UseCase struct {
@@ -44,11 +46,11 @@ type UseCase struct {
 	marketRepo MarketRepository
 	txManager  TXManager
 	converter  Converter
-	bookWriter BookWriter
+	commandBus CommandBus
 }
 
-func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
-	if err := input.Validate(ctx); err != nil {
+func (u *UseCase) Execute(ctx context.Context, input Input) (_ Output, err error) {
+	if err = input.Validate(ctx); err != nil {
 		return Output{}, errors.Wrap(err, "input validate")
 	}
 
@@ -62,17 +64,35 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "get debit asset")
 	}
 
-	debitAmount, err := order.GetDebitAmount()
+	debitAmount, err := order.GetDebitOrderedAmount()
 	if err != nil {
 		return Output{}, errors.Wrap(err, "get debit amount")
 	}
+
+	// The order reaches the orders only once the engine has placed it: until then it is
+	// a create command in the command log, with its funds already reserved.
+	commandID, err := uuid.NewV7()
+	if err != nil {
+		return Output{}, errors.Wrap(err, "gen command id")
+	}
+	command := entity.NewCreateOrderCommand(commandID, order)
+
+	ticket, err := u.commandBus.GetWriteAccess(ctx)
+	if err != nil {
+		return Output{}, errors.Wrap(err, "commandBus GetWriteAccess")
+	}
+	defer func() {
+		if ticketErr := ticket.ReleaseWriteAccess(); ticketErr != nil {
+			err = stdErrors.Join(err, ticketErr)
+		}
+	}()
 
 	fn := func(ctx context.Context) error {
 		if err = u.walletRepo.ReserveFunds(ctx, order.UserID, symbol.ID, debitAmount); err != nil {
 			return errors.Wrap(err, "wallet repo reserve funds")
 		}
-		if err = u.orderRepo.CreateOrder(ctx, order); err != nil {
-			return errors.Wrap(err, "repo create order")
+		if err = u.orderRepo.CreateOrderCommand(ctx, command); err != nil {
+			return errors.Wrap(err, "repo create order command")
 		}
 		return nil
 	}
@@ -81,9 +101,8 @@ func (u *UseCase) Execute(ctx context.Context, input Input) (Output, error) {
 		return Output{}, errors.Wrap(err, "tx manager with tx")
 	}
 
-	if err = u.bookWriter.InsertOrder(ctx, order); err != nil {
-		// TODO: cancel the order
-		return Output{}, errors.Wrap(err, "bookWriter insert order")
+	if err = ticket.SendPlaceOrder(commandID, order); err != nil {
+		return Output{}, errors.Wrap(err, "ticket SendPlaceOrder")
 	}
 
 	return Output{}, nil
@@ -125,7 +144,7 @@ func NewUseCase(
 	marketRepo MarketRepository,
 	txManager TXManager,
 	converter Converter,
-	bookWriter BookWriter,
+	commandBus CommandBus,
 ) *UseCase {
 	return &UseCase{
 		orderRepo:  repo,
@@ -133,6 +152,6 @@ func NewUseCase(
 		marketRepo: marketRepo,
 		txManager:  txManager,
 		converter:  converter,
-		bookWriter: bookWriter,
+		commandBus: commandBus,
 	}
 }

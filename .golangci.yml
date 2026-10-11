@@ -135,7 +135,9 @@ linters:
       enable-all: true
       settings:
         shadow:
-          strict: true
+          # Non-strict only reports a shadowed variable that is still used afterwards (the real
+          # bug); strict also flags every `x, err :=` in a nested block, which is idiomatic Go.
+          strict: false
     inamedparam:
       skip-single-param: true
     mnd:

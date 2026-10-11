@@ -11,6 +11,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelOrder = `-- name: CancelOrder :execrows
+UPDATE "order"."order"
+SET status = 'cancelled',
+    last_updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) CancelOrder(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelOrder, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createOrder = `-- name: CreateOrder :exec
 INSERT INTO "order"."order" (id, user_id, market_pair_id, side, quantity_ordered, price, status)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -39,6 +54,28 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 	return err
 }
 
+const createOrderCommand = `-- name: CreateOrderCommand :exec
+INSERT INTO "order".command_log_usd_kcn (id, type, order_id, order_details)
+    VALUES ($1, $2, $3, $4)
+`
+
+type CreateOrderCommandParams struct {
+	ID           uuid.UUID
+	Type         OrderCommandType
+	OrderID      uuid.UUID
+	OrderDetails []byte
+}
+
+func (q *Queries) CreateOrderCommand(ctx context.Context, arg CreateOrderCommandParams) error {
+	_, err := q.db.Exec(ctx, createOrderCommand,
+		arg.ID,
+		arg.Type,
+		arg.OrderID,
+		arg.OrderDetails,
+	)
+	return err
+}
+
 const fillOrder = `-- name: FillOrder :execrows
 UPDATE "order"."order"
 SET quantity_filled = quantity_filled + $1::bigint,
@@ -61,6 +98,108 @@ func (q *Queries) FillOrder(ctx context.Context, arg FillOrderParams) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getAllCommands = `-- name: GetAllCommands :many
+SELECT id, type, order_id, order_details FROM "order".command_log_usd_kcn ORDER BY id ASC
+`
+
+func (q *Queries) GetAllCommands(ctx context.Context) ([]OrderCommandLogUsdKcn, error) {
+	rows, err := q.db.Query(ctx, getAllCommands)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrderCommandLogUsdKcn
+	for rows.Next() {
+		var i OrderCommandLogUsdKcn
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.OrderID,
+			&i.OrderDetails,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllOpenOrders = `-- name: GetAllOpenOrders :many
+SELECT id, user_id, market_pair_id, side, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE status IN ('open', 'partially_filled') ORDER BY created_at ASC
+`
+
+func (q *Queries) GetAllOpenOrders(ctx context.Context) ([]OrderOrder, error) {
+	rows, err := q.db.Query(ctx, getAllOpenOrders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrderOrder
+	for rows.Next() {
+		var i OrderOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MarketPairID,
+			&i.Side,
+			&i.QuantityOrdered,
+			&i.QuantityFilled,
+			&i.Price,
+			&i.Status,
+			&i.CreatedAt,
+			&i.LastUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOrderCancelInfo = `-- name: GetOrderCancelInfo :one
+SELECT user_id, status FROM "order"."order" WHERE id = $1
+`
+
+type GetOrderCancelInfoRow struct {
+	UserID uuid.UUID
+	Status string
+}
+
+func (q *Queries) GetOrderCancelInfo(ctx context.Context, id uuid.UUID) (GetOrderCancelInfoRow, error) {
+	row := q.db.QueryRow(ctx, getOrderCancelInfo, id)
+	var i GetOrderCancelInfoRow
+	err := row.Scan(&i.UserID, &i.Status)
+	return i, err
+}
+
+const getOrderForUpdate = `-- name: GetOrderForUpdate :one
+SELECT id, user_id, market_pair_id, side, quantity_ordered, quantity_filled, price, status, created_at, last_updated_at FROM "order"."order" WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetOrderForUpdate(ctx context.Context, id uuid.UUID) (OrderOrder, error) {
+	row := q.db.QueryRow(ctx, getOrderForUpdate, id)
+	var i OrderOrder
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MarketPairID,
+		&i.Side,
+		&i.QuantityOrdered,
+		&i.QuantityFilled,
+		&i.Price,
+		&i.Status,
+		&i.CreatedAt,
+		&i.LastUpdatedAt,
+	)
+	return i, err
 }
 
 const getUserOrdersByStatuses = `-- name: GetUserOrdersByStatuses :many
@@ -101,4 +240,20 @@ func (q *Queries) GetUserOrdersByStatuses(ctx context.Context, arg GetUserOrders
 		return nil, err
 	}
 	return items, nil
+}
+
+const takeOrderCommand = `-- name: TakeOrderCommand :one
+DELETE FROM "order".command_log_usd_kcn WHERE id = $1 RETURNING id, type, order_id, order_details
+`
+
+func (q *Queries) TakeOrderCommand(ctx context.Context, id uuid.UUID) (OrderCommandLogUsdKcn, error) {
+	row := q.db.QueryRow(ctx, takeOrderCommand, id)
+	var i OrderCommandLogUsdKcn
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.OrderID,
+		&i.OrderDetails,
+	)
+	return i, err
 }

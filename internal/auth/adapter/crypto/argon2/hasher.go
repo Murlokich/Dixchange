@@ -62,8 +62,7 @@ func (p *PasswordHasher) GeneratePasswordHash(password string) (string, error) {
 }
 
 func (p *PasswordHasher) ComparePasswords(password string, passwordHash string) (bool, error) {
-	// Extract the parameters, salt and derived key from the encoded password
-	// hash.
+	// Extract the parameters, salt and derived key from the encoded password hash.
 	hashParams, salt, hash, err := decodeHash(passwordHash)
 	if err != nil {
 		return false, errors.Wrap(err, "decode password hash")
@@ -134,7 +133,6 @@ func (p *PasswordHasher) genSalt() ([]byte, error) {
 	return salt, nil
 }
 
-// TODO: check non-negative values
 func NewArgon2(c *config.Argon2Config) *PasswordHasher {
 	return &PasswordHasher{
 		params: Params{
