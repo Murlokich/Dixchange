@@ -13,6 +13,9 @@ test: ## Run tests and display coverage
 	@go tool cover -func=coverage.out
 	@rm -f coverage.out
 
+test-integration: ## Run integration tests (needs Docker)
+	@go test -tags integration -count=1 ./test/integration/...
+
 gen: ## Generate code: sqlc
 	@sqlc generate
 	@mockery

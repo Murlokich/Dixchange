@@ -123,12 +123,9 @@ func (s *SettlementService) settlePlacement(ctx context.Context, event eventbus.
 // dropCancel removes a cancel command the engine had nothing to apply for: the order
 // wasn't in the book anymore, so there is nothing to change in the orders.
 func (s *SettlementService) dropCancel(ctx context.Context, commandID uuid.UUID) error {
-	command, err := s.orderRepo.TakeOrderCommand(ctx, commandID)
+	_, err := s.orderRepo.TakeOrderCommand(ctx, commandID)
 	if err != nil {
 		return pkgerrors.Wrap(err, "order repo take order command")
-	}
-	if command.Type != entity.OrderCommandCancel {
-		return pkgerrors.Errorf("order command %s is %s, not cancel", command.ID, command.Type)
 	}
 	return nil
 }
@@ -142,9 +139,6 @@ func (s *SettlementService) executeCancellation(ctx context.Context, commandID u
 		command, err := s.orderRepo.TakeOrderCommand(ctx, commandID)
 		if err != nil {
 			return pkgerrors.Wrap(err, "order repo take order command")
-		}
-		if command.Type != entity.OrderCommandCancel {
-			return pkgerrors.Errorf("order command %s is %s, not cancel", command.ID, command.Type)
 		}
 		orderID := command.OrderID
 
