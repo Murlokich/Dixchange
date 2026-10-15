@@ -17,18 +17,27 @@ import (
 	shopspringDecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"github.com/dixchange/Monolith/internal/config"
 )
 
 // migrationsURL is relative to this package: go test runs with the package directory as
 // the working directory.
 const migrationsURL = "file://../../migrations"
 
-// testDB is shared by every test of the package. The tests share one order book table
-// and the market data, so they must not run in parallel.
-var testDB *pgxpool.Pool
+var (
+	// testCfg is the app's own config, read from the environment like cmd/app.go does:
+	// make test-integration loads envs/.env with envs/integration.env taking precedence. Only
+	// the database URL is ignored; the container provides it.
+	testCfg config.Config
+	// testDB is shared by every test of the package. The tests share one order book table
+	// and the market data, so they must not run in parallel.
+	testDB *pgxpool.Pool
+)
 
 func TestMain(m *testing.M) {
 	code, err := run(m)
@@ -42,6 +51,13 @@ func TestMain(m *testing.M) {
 // run lives apart from TestMain so its deferred cleanup runs before os.Exit.
 func run(m *testing.M) (int, error) {
 	ctx := context.Background()
+
+	if err := envconfig.Process("", &testCfg); err != nil {
+		return 0, errors.Wrap(err, "process config (run the tests with make test-integration)")
+	}
+	if err := testCfg.Validate(); err != nil {
+		return 0, errors.Wrap(err, "validate config")
+	}
 
 	container, err := postgres.Run(ctx, "postgres:18",
 		postgres.WithDatabase("monolith"),
@@ -62,7 +78,7 @@ func run(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "postgres connection string")
 	}
-	if err = migrateUp(dsn); err != nil {
+	if err = migrateTo(dsn, testCfg.DBConfig.MigrationVersion); err != nil {
 		return 0, errors.Wrap(err, "migrate")
 	}
 
@@ -75,13 +91,15 @@ func run(m *testing.M) (int, error) {
 	return m.Run(), nil
 }
 
-func migrateUp(dsn string) error {
+// migrateTo migrates to the version the app uses, not the latest: a migration the app
+// doesn't run yet must not be tested either.
+func migrateTo(dsn string, version uint) error {
 	m, err := migrate.New(migrationsURL, dsn)
 	if err != nil {
 		return errors.Wrap(err, "create migration")
 	}
-	if err = m.Up(); err != nil {
-		return errors.Wrap(err, "migrate up")
+	if err = m.Migrate(version); err != nil {
+		return errors.Wrapf(err, "migrate to version %d", version)
 	}
 	srcErr, dbErr := m.Close()
 	if srcErr != nil {

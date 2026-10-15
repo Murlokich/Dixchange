@@ -7,7 +7,6 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
-	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
@@ -84,16 +82,13 @@ func newHarness(t *testing.T) *harness {
 	}
 	txManager := pkg.NewTXManager(testDB)
 	converter := service.NewConverter()
-	// Cheap hashing parameters: the tests register many users and don't test hashing.
-	hasher := argon2.NewArgon2(&config.Argon2Config{
-		Memory: 8 * 1024, Iterations: 1, Threads: 1, HashLength: 16, SaltLength: 16,
-	})
+	// Each harness gets its own copy, so a test can change a field for itself only.
+	cfg := testCfg
+	hasher := argon2.NewArgon2(&cfg.Argon2Config)
 
-	commandBus := commandbus.NewCommandBus(&config.CommandBusConfig{
-		BufferSize: 100, SendTimeout: 100 * time.Millisecond,
-	})
-	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&config.EventBusConfig{BufferSize: 100})}
-	book := orderbook.NewBook(&config.OrderBook{B: 8}, pair)
+	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
+	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&cfg.EventBusConfig)}
+	book := orderbook.NewBook(&cfg.OrderBookConfig, pair)
 
 	h := &harness{
 		pair:           pair,
