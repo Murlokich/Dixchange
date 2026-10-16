@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
 	"github.com/dixchange/Monolith/internal/domain/usecase/register"
@@ -56,6 +57,21 @@ func (h *harness) depositFunds(t *testing.T, userID uuid.UUID, symbolID int, amo
 	if err != nil {
 		t.Fatalf("deposit %s of symbol %d: %v", amount, symbolID, err)
 	}
+}
+
+// placeOrder calls the create order use case on the pair, with quantity and price as
+// decimal strings. It returns once the command is accepted, before the engine has placed
+// the order: call waitSettled before checking the result.
+func (h *harness) placeOrder(t *testing.T, userID uuid.UUID, side, quantity, price string) error {
+	t.Helper()
+	_, err := h.createOrder.Execute(context.Background(), createorder.Input{
+		UserID:          userID,
+		MarketPairID:    pairID,
+		Side:            side,
+		QuantityOrdered: decimal.RequireFromString(quantity),
+		PricePerUnit:    decimal.RequireFromString(price),
+	})
+	return err
 }
 
 // waitSettled waits until every command accepted so far has gone through the engine and

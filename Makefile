@@ -1,3 +1,5 @@
+.PHONY: help fmt test test-integration gen lint infra-up rebuild-up up down
+
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		sort | \
@@ -9,14 +11,12 @@ fmt:  ## Format the code
 
 
 test: ## Run tests and display coverage
-	@go test -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out
-	@rm -f coverage.out
+	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
 
 # envs/integration.env overrides envs/.env (godotenv: the first listed file wins).
 test-integration: ## Run integration tests (needs Docker)
 	@go tool godotenv -f envs/integration.env,envs/.env \
-		go test -tags integration -count=1 ./test/integration/...
+		go tool gotestsum --format testname -- -tags integration -count=1 ./test/integration/...
 
 gen: ## Generate code: sqlc
 	@sqlc generate

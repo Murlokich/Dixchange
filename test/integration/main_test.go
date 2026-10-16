@@ -20,6 +20,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/testcontainers/testcontainers-go"
+	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/dixchange/Monolith/internal/config"
@@ -59,6 +60,9 @@ func run(m *testing.M) (int, error) {
 		return 0, errors.Wrap(err, "validate config")
 	}
 
+	// Testcontainers logs its progress to stderr, around the test results. Its errors are
+	// still returned.
+	tclog.SetDefault(tclog.NewNoopLogger())
 	container, err := postgres.Run(ctx, "postgres:18",
 		postgres.WithDatabase("monolith"),
 		postgres.WithUsername("developer"),

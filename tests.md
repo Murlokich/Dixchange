@@ -45,4 +45,12 @@ The tests share one database and one order book, so they don't run in parallel.
 
 ### Test cases
 
-To be added as the tests are written.
+Amounts in the tests are in minor units. The only pair is USD/KCN: USD (base) has 2 decimals,
+so 1 USD is 100; KCN (quote) has none.
+
+**Creating an order** (`create_order_test.go`)
+
+- *Ask reserves the base quantity.* A user with 10 USD sells 3 USD at 7 KCN. 3 USD move from
+  available to reserved, and the order is stored as open with nothing filled.
+- *Bid reserves the quote notional.* A user with 100 KCN buys 3 USD at 7 KCN. 21 KCN
+  (quantity × price) move from available to reserved, and the order is stored as open.
