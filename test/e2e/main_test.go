@@ -1,9 +1,9 @@
-//go:build integration
+//go:build e2e
 
-// Package integration tests the application with a real Postgres: the use cases, the
+// Package e2e tests the application with a real Postgres: the use cases, the
 // matching engine and settlement are wired as in cmd/app.go, but the tests control when
 // the engine and settlement run and can read the database directly.
-package integration
+package e2e
 
 import (
 	"context"
@@ -32,7 +32,7 @@ const migrationsURL = "file://../../migrations"
 
 var (
 	// testCfg is the app's own config, read from the environment like cmd/app.go does:
-	// make test-integration loads envs/.env with envs/integration.env taking precedence. Only
+	// make test-e2e loads envs/.env with envs/e2e.env taking precedence. Only
 	// the database URL is ignored; the container provides it.
 	testCfg config.Config
 	// testDB is shared by every test of the package. The tests share one order book table
@@ -54,7 +54,7 @@ func run(m *testing.M) (int, error) {
 	ctx := context.Background()
 
 	if err := envconfig.Process("", &testCfg); err != nil {
-		return 0, errors.Wrap(err, "process config (run the tests with make test-integration)")
+		return 0, errors.Wrap(err, "process config (run the tests with make test-e2e)")
 	}
 	if err := testCfg.Validate(); err != nil {
 		return 0, errors.Wrap(err, "validate config")

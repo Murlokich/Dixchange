@@ -1,4 +1,4 @@
-.PHONY: help fmt test test-integration gen lint infra-up rebuild-up up down
+.PHONY: help fmt test test-e2e gen lint infra-up rebuild-up up down
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -13,10 +13,10 @@ fmt:  ## Format the code
 test: ## Run tests and display coverage
 	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
 
-# envs/integration.env overrides envs/.env (godotenv: the first listed file wins).
-test-integration: ## Run integration tests (needs Docker)
-	@go tool godotenv -f envs/integration.env,envs/.env \
-		go tool gotestsum --format testname -- -tags integration -count=1 ./test/integration/...
+# envs/e2e.env overrides envs/.env (godotenv: the first listed file wins).
+test-e2e: ## Run e2e tests (needs Docker)
+	@go tool godotenv -f envs/e2e.env,envs/.env \
+		go tool gotestsum --format testname -- -tags e2e -count=1 ./test/e2e/...
 
 gen: ## Generate code: sqlc
 	@sqlc generate
