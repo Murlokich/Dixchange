@@ -75,6 +75,37 @@ func (h *harness) placeOrder(t *testing.T, userID uuid.UUID, side, quantity, pri
 	return err
 }
 
+// mustPlaceOrder places an order as a setup step: it fails the test if the order isn't
+// accepted, waits until it is settled and returns its ID. The status isn't checked: an
+// order that crosses the book may already be filled. It needs the engine and settlement
+// running.
+func (h *harness) mustPlaceOrder(t *testing.T, userID uuid.UUID, side, quantity, price string) uuid.UUID {
+	t.Helper()
+
+	// The use case doesn't return the order ID, so the new order is the one the user
+	// didn't have before.
+	before := make(map[uuid.UUID]bool)
+	for _, o := range h.orders(t, userID) {
+		before[o.ID] = true
+	}
+
+	if err := h.placeOrder(t, userID, side, quantity, price); err != nil {
+		t.Fatalf("place order: %v", err)
+	}
+	h.waitSettled(t)
+
+	var added []uuid.UUID
+	for _, o := range h.orders(t, userID) {
+		if !before[o.ID] {
+			added = append(added, o.ID)
+		}
+	}
+	if len(added) != 1 {
+		t.Fatalf("place order: want 1 new order, got %d", len(added))
+	}
+	return added[0]
+}
+
 // cancel calls the cancel order use case. It returns once the command is accepted, before
 // the engine has removed the order: call waitSettled before checking the result.
 func (h *harness) cancel(t *testing.T, userID, orderID uuid.UUID) error {
@@ -112,7 +143,8 @@ func (h *harness) waitSettled(t *testing.T) {
 func (h *harness) commandLogLen(t *testing.T) int {
 	t.Helper()
 	var n int
-	if err := testDB.QueryRow(context.Background(), `SELECT count(*) FROM "order".command_log_usd_kcn`).Scan(&n); err != nil {
+	err := testDB.QueryRow(context.Background(), `SELECT count(*) FROM "order".command_log_usd_kcn`).Scan(&n)
+	if err != nil {
 		t.Fatalf("count command log: %v", err)
 	}
 	return n

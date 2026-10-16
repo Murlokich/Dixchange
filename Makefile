@@ -23,7 +23,7 @@ gen: ## Generate code: sqlc
 	@mockery
 
 lint: ## Run linters
-	@golangci-lint run -v --timeout=5m ./...
+	@golangci-lint run -v --timeout=5m --build-tags e2e ./...
 
 infra-up: ## Run infra
 	@docker compose up db jaeger -d

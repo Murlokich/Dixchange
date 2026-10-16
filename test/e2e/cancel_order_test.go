@@ -22,14 +22,9 @@ func TestCancelOrder_Ask_ReleasesBaseQuantity(t *testing.T) {
 	h := newHarness(t)
 	user := h.newUser(t, "10", "") // 10 USD, no KCN
 
-	err := h.placeOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
-	require.NoError(t, err)
-	h.waitSettled(t)
-	orders := h.orders(t, user)
-	require.Len(t, orders, 1)
-	orderID := orders[0].ID
+	orderID := h.mustPlaceOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
 
-	err = h.cancel(t, user, orderID)
+	err := h.cancel(t, user, orderID)
 	require.NoError(t, err)
 	h.waitSettled(t)
 
@@ -38,7 +33,7 @@ func TestCancelOrder_Ask_ReleasesBaseQuantity(t *testing.T) {
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID, Main: 1000}, balances.Base)
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
 
-	orders = h.orders(t, user)
+	orders := h.orders(t, user)
 	require.Len(t, orders, 1)
 	assert.Equal(t, orderRow{
 		ID:              orderID,
@@ -53,14 +48,9 @@ func TestCancelOrder_Bid_ReleasesQuoteNotional(t *testing.T) {
 	h := newHarness(t)
 	user := h.newUser(t, "", "100") // no USD, 100 KCN
 
-	err := h.placeOrder(t, user, entity.BuySide, "3", "7") // buy 3 USD at 7 KCN
-	require.NoError(t, err)
-	h.waitSettled(t)
-	orders := h.orders(t, user)
-	require.Len(t, orders, 1)
-	orderID := orders[0].ID
+	orderID := h.mustPlaceOrder(t, user, entity.BuySide, "3", "7") // buy 3 USD at 7 KCN
 
-	err = h.cancel(t, user, orderID)
+	err := h.cancel(t, user, orderID)
 	require.NoError(t, err)
 	h.waitSettled(t)
 
@@ -69,7 +59,7 @@ func TestCancelOrder_Bid_ReleasesQuoteNotional(t *testing.T) {
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID}, balances.Base)
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 100}, balances.Quote)
 
-	orders = h.orders(t, user)
+	orders := h.orders(t, user)
 	require.Len(t, orders, 1)
 	assert.Equal(t, orderRow{
 		ID:              orderID,
@@ -88,17 +78,12 @@ func TestCancelOrder_Twice_ReleasesFundsOnce(t *testing.T) {
 	h := newHarness(t)
 	user := h.newUser(t, "10", "") // 10 USD, no KCN
 
-	err := h.placeOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
-	require.NoError(t, err)
-	h.waitSettled(t)
-	orders := h.orders(t, user)
-	require.Len(t, orders, 1)
-	orderID := orders[0].ID
+	orderID := h.mustPlaceOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
 
 	// With the engine stopped, the first cancel can't be settled before the second one
 	// checks the order: both wait in the command bus.
 	h.stopEngine(t)
-	err = h.cancel(t, user, orderID)
+	err := h.cancel(t, user, orderID)
 	require.NoError(t, err)
 	err = h.cancel(t, user, orderID)
 	require.NoError(t, err)
@@ -110,7 +95,7 @@ func TestCancelOrder_Twice_ReleasesFundsOnce(t *testing.T) {
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID, Main: 1000}, balances.Base)
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
 
-	orders = h.orders(t, user)
+	orders := h.orders(t, user)
 	require.Len(t, orders, 1)
 	assert.Equal(t, orderRow{
 		ID:              orderID,
