@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
 	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
 	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
@@ -71,6 +72,14 @@ func (h *harness) placeOrder(t *testing.T, userID uuid.UUID, side, quantity, pri
 		QuantityOrdered: decimal.RequireFromString(quantity),
 		PricePerUnit:    decimal.RequireFromString(price),
 	})
+	return err
+}
+
+// cancel calls the cancel order use case. It returns once the command is accepted, before
+// the engine has removed the order: call waitSettled before checking the result.
+func (h *harness) cancel(t *testing.T, userID, orderID uuid.UUID) error {
+	t.Helper()
+	_, err := h.cancelOrder.Execute(context.Background(), cancelorder.Input{UserID: userID, OrderID: orderID})
 	return err
 }
 

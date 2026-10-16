@@ -22,7 +22,8 @@ func TestCreateOrder_Ask_ReservesBaseQuantity(t *testing.T) {
 	h := newHarness(t)
 	user := h.newUser(t, "10", "") // 10 USD, no KCN
 
-	require.NoError(t, h.placeOrder(t, user, entity.SellSide, "3", "7")) // sell 3 USD at 7 KCN
+	err := h.placeOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
+	require.NoError(t, err)
 	h.waitSettled(t)
 
 	// An ask reserves the base it sells: 3 USD.
@@ -45,7 +46,8 @@ func TestCreateOrder_Bid_ReservesQuoteNotional(t *testing.T) {
 	h := newHarness(t)
 	user := h.newUser(t, "", "100") // no USD, 100 KCN
 
-	require.NoError(t, h.placeOrder(t, user, entity.BuySide, "3", "7")) // buy 3 USD at 7 KCN
+	err := h.placeOrder(t, user, entity.BuySide, "3", "7") // buy 3 USD at 7 KCN
+	require.NoError(t, err)
 	h.waitSettled(t)
 
 	// A bid reserves the quote it pays at its own price: 3 * 7 = 21 KCN.
