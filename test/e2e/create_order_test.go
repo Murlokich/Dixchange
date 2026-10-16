@@ -63,3 +63,39 @@ func TestCreateOrder_Bid_ReservesQuoteNotional(t *testing.T) {
 		Status:          entity.StatusOpen,
 	}, orders[0])
 }
+
+// An order without enough funds is rejected in the request: the funds reservation and the
+// command are one transaction, so nothing is reserved and nothing reaches the engine.
+
+func TestCreateOrder_Ask_InsufficientBase_Rejected(t *testing.T) {
+	h := newHarness(t)
+	user := h.newUser(t, "2", "") // 2 USD, no KCN
+
+	err := h.placeOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
+	require.ErrorIs(t, err, entity.ErrInsufficientBalance)
+	// Returns at once if nothing was accepted; otherwise waits, and the checks below fail.
+	h.waitSettled(t)
+
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID, Main: 200}, balances.Base)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
+	assert.Zero(t, h.commandLogLen(t), "command log")
+	assert.Empty(t, h.orders(t, user))
+}
+
+func TestCreateOrder_Bid_InsufficientQuote_Rejected(t *testing.T) {
+	h := newHarness(t)
+	user := h.newUser(t, "", "100") // no USD, 100 KCN
+
+	// Buying 3 USD at 50 KCN costs 3 * 50 = 150 KCN.
+	err := h.placeOrder(t, user, entity.BuySide, "3", "50")
+	require.ErrorIs(t, err, entity.ErrInsufficientBalance)
+	// Returns at once if nothing was accepted; otherwise waits, and the checks below fail.
+	h.waitSettled(t)
+
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID}, balances.Base)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 100}, balances.Quote)
+	assert.Zero(t, h.commandLogLen(t), "command log")
+	assert.Empty(t, h.orders(t, user))
+}
