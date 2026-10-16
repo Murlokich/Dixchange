@@ -79,3 +79,44 @@ func TestCancelOrder_Bid_ReleasesQuoteNotional(t *testing.T) {
 		Status:          entity.StatusCancelled,
 	}, orders[0])
 }
+
+// Two cancels of the same order can both be accepted: each checks the order in the DB,
+// where it stays active until the first cancel is settled. The engine removes the order
+// on the first and rejects the second, so the funds are released only once.
+
+func TestCancelOrder_Twice_ReleasesFundsOnce(t *testing.T) {
+	h := newHarness(t)
+	user := h.newUser(t, "10", "") // 10 USD, no KCN
+
+	err := h.placeOrder(t, user, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
+	require.NoError(t, err)
+	h.waitSettled(t)
+	orders := h.orders(t, user)
+	require.Len(t, orders, 1)
+	orderID := orders[0].ID
+
+	// With the engine stopped, the first cancel can't be settled before the second one
+	// checks the order: both wait in the command bus.
+	h.stopEngine(t)
+	err = h.cancel(t, user, orderID)
+	require.NoError(t, err)
+	err = h.cancel(t, user, orderID)
+	require.NoError(t, err)
+	h.startEngine()
+	h.waitSettled(t)
+
+	// The 3 USD reserved by the ask are available again, released once.
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID, Main: 1000}, balances.Base)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
+
+	orders = h.orders(t, user)
+	require.Len(t, orders, 1)
+	assert.Equal(t, orderRow{
+		ID:              orderID,
+		Side:            entity.SellSide,
+		Price:           7,
+		QuantityOrdered: 300,
+		Status:          entity.StatusCancelled,
+	}, orders[0])
+}
