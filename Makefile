@@ -13,9 +13,12 @@ fmt:  ## Format the code
 test: ## Run tests and display coverage
 	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
 
-# envs/e2e.env overrides envs/.env (godotenv: the first listed file wins).
+# The env files test-e2e loads; the first listed file wins (godotenv), so envs/e2e.env
+# overrides the app's own config. CI passes its own: make test-e2e E2E_ENV_FILES=...
+E2E_ENV_FILES ?= envs/e2e.env,envs/.env
+
 test-e2e: ## Run e2e tests (needs Docker)
-	@go tool godotenv -f envs/e2e.env,envs/.env \
+	@go tool godotenv -f $(E2E_ENV_FILES) \
 		go tool gotestsum --format testname -- -tags e2e -count=1 ./test/e2e/...
 
 gen: ## Generate code: sqlc
