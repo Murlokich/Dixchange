@@ -230,3 +230,35 @@ func TestCancelOrder_UnknownOrder_NotFound(t *testing.T) {
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
 	assert.Zero(t, h.commandLogLen(t), "command log")
 }
+
+// A cancel of another user's order is rejected in the request, before a command is
+// written: the order stays in the book and its funds stay reserved.
+
+func TestCancelOrder_OtherUsersOrder_NotOwned(t *testing.T) {
+	h := newHarness(t)
+	owner := h.newUser(t, "10", "") // 10 USD, no KCN
+	other := h.newUser(t, "", "")
+
+	orderID := h.mustPlaceOrder(t, owner, entity.SellSide, "3", "7") // sell 3 USD at 7 KCN
+
+	err := h.cancel(t, other, orderID)
+	require.ErrorIs(t, err, entity.ErrOrderNotOwned)
+	// Returns at once if nothing was accepted; otherwise waits, and the checks below fail.
+	h.waitSettled(t)
+
+	// The 3 USD stay reserved for the owner's order.
+	balances := h.balances(t, owner)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Base.ID, Main: 700, Reserved: 300}, balances.Base)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID}, balances.Quote)
+	assert.Zero(t, h.commandLogLen(t), "command log")
+
+	orders := h.orders(t, owner)
+	require.Len(t, orders, 1)
+	assert.Equal(t, orderRow{
+		ID:              orderID,
+		Side:            entity.SellSide,
+		Price:           7,
+		QuantityOrdered: 300,
+		Status:          entity.StatusOpen,
+	}, orders[0])
+}
