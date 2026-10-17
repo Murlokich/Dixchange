@@ -95,10 +95,9 @@ type OrderBook struct {
 	B int `default:"8"`
 }
 
-// minBTreeDegree is the smallest degree btree.NewG accepts; it panics below it.
-const minBTreeDegree = 2
-
 func (o *OrderBook) Validate() error {
+	const minBTreeDegree = 2
+
 	if o.B < minBTreeDegree {
 		return errors.Errorf("B must be at least %d, got %d", minBTreeDegree, o.B)
 	}

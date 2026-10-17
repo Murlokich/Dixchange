@@ -1,3 +1,5 @@
+.PHONY: help fmt test test-e2e gen lint infra-up rebuild-up up down
+
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		sort | \
@@ -9,16 +11,22 @@ fmt:  ## Format the code
 
 
 test: ## Run tests and display coverage
-	@go test -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out
-	@rm -f coverage.out
+	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
+
+# The env files test-e2e loads; the first listed file wins (godotenv), so envs/e2e.env
+# overrides the app's own config. CI passes its own: make test-e2e E2E_ENV_FILES=...
+E2E_ENV_FILES ?= envs/e2e.env,envs/.env
+
+test-e2e: ## Run e2e tests (needs Docker)
+	@go tool godotenv -f $(E2E_ENV_FILES) \
+		go tool gotestsum --format testname -- -tags e2e -count=1 ./test/e2e/...
 
 gen: ## Generate code: sqlc
 	@sqlc generate
 	@mockery
 
 lint: ## Run linters
-	@golangci-lint run -v --timeout=5m ./...
+	@golangci-lint run -v --timeout=5m --build-tags e2e ./...
 
 infra-up: ## Run infra
 	@docker compose up db jaeger -d

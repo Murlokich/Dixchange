@@ -1,14 +1,20 @@
 name: CI/CD workflow
 run-name: Triggered by @${{ github.actor }}
 on:
+  # Default activity types: opened, synchronize (new commits pushed) and reopened.
   pull_request:
-    types: [opened, reopened]
     branches:
       - 'main'
   push:
       branches:
         - 'main'
         
+# A new run for the same PR or branch cancels the one still running: only the latest
+# commit matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -19,9 +25,10 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.12.2
+          version: v2.15.0
+          args: --build-tags e2e
 
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,5 +39,21 @@ jobs:
         with:
           go-version: '1.26'
 
-      - name: Run tests
-        run: go test -v ./...
+      - name: Run unit tests
+        run: make test
+
+  # Postgres runs in a container started by the tests (testcontainers): the runner's
+  # Docker is enough, no database service is needed.
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Run e2e tests
+        run: make test-e2e E2E_ENV_FILES=envs/e2e.env,envs/.env.github_runner
