@@ -14,6 +14,7 @@ import (
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
@@ -40,6 +41,8 @@ const pairID = 1
 // use cases directly. The engine and settlement run in the background and can be stopped
 // and started again, so a test can hold commands or events back to set up a race.
 type harness struct {
+	// cfg is this harness's copy of testCfg, the config its components were built with.
+	cfg  config.Config
 	pair entity.Pair
 
 	register       *register.UseCase
@@ -91,6 +94,7 @@ func newHarness(t *testing.T) *harness {
 	book := orderbook.NewBook(&cfg.OrderBookConfig, pair)
 
 	h := &harness{
+		cfg:            cfg,
 		pair:           pair,
 		register:       register.NewUseCase(userRepo, hasher, walletRepo, marketCache, txManager),
 		deposit:        deposit.NewUseCase(walletRepo, marketCache, converter),
