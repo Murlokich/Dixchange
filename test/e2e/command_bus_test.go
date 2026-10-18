@@ -61,3 +61,37 @@ func TestCommandBus_Full_RejectsOverload(t *testing.T) {
 	err := h.placeOrder(t, user, entity.BuySide, "1", "1")
 	require.NoError(t, err)
 }
+
+// A request rejected after taking its slot gives the slot back: create order takes it
+// before the funds reservation, so an order without enough funds holds a slot it never
+// uses. With the engine stopped and the bus one slot short of full, a leaked slot would
+// reject the next good order, and a slot given back twice would admit one too many.
+
+func TestCommandBus_RejectedOrder_FreesSlot(t *testing.T) {
+	h := newHarness(t)
+	capacity := h.cfg.CommandBusConfig.BufferSize
+
+	// Each bid of 1 USD at 1 KCN reserves 1 KCN: enough funds for the capacity-1 orders
+	// before the rejected one and the one after it.
+	user := h.newUser(t, "", strconv.Itoa(capacity))
+
+	h.stopEngine(t)
+	for i := range capacity - 1 {
+		err := h.placeOrder(t, user, entity.BuySide, "1", "1")
+		require.NoError(t, err, "order %d of %d", i+1, capacity-1)
+	}
+
+	// Buying 1 USD at 1000 KCN costs more than the 1 KCN left.
+	err := h.placeOrder(t, user, entity.BuySide, "1", "1000")
+	require.ErrorIs(t, err, entity.ErrInsufficientBalance)
+
+	// The last slot is free again: the next good order takes it and fills the bus.
+	err = h.placeOrder(t, user, entity.BuySide, "1", "1")
+	require.NoError(t, err)
+	err = h.placeOrder(t, user, entity.BuySide, "1", "1")
+	require.ErrorIs(t, err, entity.ErrCommandBusOverloaded)
+
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Reserved: int64(capacity)}, balances.Quote)
+	assert.Equal(t, capacity, h.commandLogLen(t), "command log")
+}
