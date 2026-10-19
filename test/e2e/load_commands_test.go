@@ -53,6 +53,45 @@ func TestLoadCommands_EngineStopped_ReplaysLog(t *testing.T) {
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 78, Reserved: 22}, balances.Quote)
 }
 
+// A command the engine already placed is lost with the book if settlement hasn't applied
+// it: its event dies in the event bus. Its log row is still there, so the restart places it
+// again, once.
+
+func TestLoadCommands_SettlementStopped_ReplaysLog(t *testing.T) {
+	h := newHarness(t)
+	user := h.newUser(t, "", "100") // no USD, 100 KCN
+
+	// With settlement stopped the engine places the orders, but their events only reach the
+	// event bus, which the crash loses. Bids that don't cross: 5 + 8 + 9 = 22 KCN reserved.
+	h.stopSettlement(t)
+	for _, o := range []struct{ quantity, price string }{{"1", "5"}, {"2", "4"}, {"3", "3"}} {
+		err := h.placeOrder(t, user, entity.BuySide, o.quantity, o.price)
+		require.NoError(t, err)
+	}
+	// Every order has gone through the engine, so the crash loses them on the way out.
+	h.waitPublished(t, 3)
+
+	assert.Empty(t, h.orders(t, user))
+	assert.Equal(t, 3, h.commandLogLen(t), "command log")
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 78, Reserved: 22}, balances.Quote)
+
+	h.restart(t)
+	h.waitSettled(t)
+
+	// The orders are placed in the order they were accepted, each once.
+	orders := h.orders(t, user)
+	require.Len(t, orders, 3)
+	assert.Equal(t, []orderRow{
+		{ID: orders[0].ID, Side: entity.BuySide, Price: 5, QuantityOrdered: 100, Status: entity.StatusOpen},
+		{ID: orders[1].ID, Side: entity.BuySide, Price: 4, QuantityOrdered: 200, Status: entity.StatusOpen},
+		{ID: orders[2].ID, Side: entity.BuySide, Price: 3, QuantityOrdered: 300, Status: entity.StatusOpen},
+	}, orders)
+	assert.Zero(t, h.commandLogLen(t), "command log")
+	balances = h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 78, Reserved: 22}, balances.Quote)
+}
+
 // With settlement stopped the engine keeps placing orders until the event bus is full, so
 // the log can hold more commands than the event bus: their events are lost in the crash.
 // Replaying them publishes more events than the bus holds, which works only because

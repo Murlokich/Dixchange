@@ -140,6 +140,21 @@ func (h *harness) waitSettled(t *testing.T) {
 	}
 }
 
+// waitPublished waits until the engine has published n events since the harness was built
+// or restarted: their commands have left the command bus and are in the engine's book.
+func (h *harness) waitPublished(t *testing.T, n int) {
+	t.Helper()
+
+	deadline := time.Now().Add(settleTimeout)
+	for h.eventBus.published.Load() < int64(n) {
+		h.failIfStopped(t)
+		if time.Now().After(deadline) {
+			t.Fatalf("%d events not published within %s: %d published", n, settleTimeout, h.eventBus.published.Load())
+		}
+		time.Sleep(settlePollRate)
+	}
+}
+
 func (h *harness) commandLogLen(t *testing.T) int {
 	t.Helper()
 	var n int
