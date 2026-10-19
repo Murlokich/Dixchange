@@ -64,6 +64,40 @@ type harness struct {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	truncate(t)
+
+	// Each harness gets its own copy, so a test can change a field for itself only.
+	h := &harness{cfg: testCfg}
+	h.build(t)
+	h.startEngine()
+	h.startSettlement()
+	t.Cleanup(func() {
+		h.stopEngine(t)
+		h.stopSettlement(t)
+	})
+	return h
+}
+
+// restart simulates a crash and a restart of the app: everything in memory is lost (the
+// book, the commands waiting in the command bus, the events waiting in the event bus) and
+// the database stays. The components are built again on the same database and started
+// the way cmd/app.go does: the book is loaded before the engine and settlement run.
+func (h *harness) restart(t *testing.T) {
+	t.Helper()
+	h.stopEngine(t)
+	h.stopSettlement(t)
+
+	h.build(t)
+	if err := h.engine.LoadOrderBook(context.Background()); err != nil {
+		t.Fatalf("load order book: %v", err)
+	}
+	h.startEngine()
+	h.startSettlement()
+}
+
+// build wires new components on the shared database, as cmd/app.go does, and puts them
+// in h, replacing any previous ones. Nothing is started.
+func (h *harness) build(t *testing.T) {
+	t.Helper()
 	ctx := context.Background()
 
 	logrusLogger := logrus.New()
@@ -85,35 +119,23 @@ func newHarness(t *testing.T) *harness {
 	}
 	txManager := pkg.NewTXManager(testDB)
 	converter := service.NewConverter()
-	// Each harness gets its own copy, so a test can change a field for itself only.
-	cfg := testCfg
-	hasher := argon2.NewArgon2(&cfg.Argon2Config)
+	hasher := argon2.NewArgon2(&h.cfg.Argon2Config)
 
-	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
-	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&cfg.EventBusConfig)}
-	book := orderbook.NewBook(&cfg.OrderBookConfig, pair)
+	commandBus := commandbus.NewCommandBus(&h.cfg.CommandBusConfig)
+	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&h.cfg.EventBusConfig)}
+	book := orderbook.NewBook(&h.cfg.OrderBookConfig, pair)
 
-	h := &harness{
-		cfg:            cfg,
-		pair:           pair,
-		register:       register.NewUseCase(userRepo, hasher, walletRepo, marketCache, txManager),
-		deposit:        deposit.NewUseCase(walletRepo, marketCache, converter),
-		createOrder:    createorder.NewUseCase(orderRepo, walletRepo, marketCache, txManager, converter, commandBus),
-		cancelOrder:    cancelorder.NewUseCase(orderRepo, commandBus),
-		getPairBalance: getpairbalance.NewUseCase(walletRepo, marketCache),
-		eventBus:       eventBus,
-		engine:         engine.NewMatchingEngine(book, commandBus, eventBus, orderRepo, logger),
-		settlement: tradeservice.NewSettlementService(
-			eventBus, tradeRepo, orderRepo, walletRepo, marketCache, txManager, logger,
-		),
-	}
-	h.startEngine()
-	h.startSettlement()
-	t.Cleanup(func() {
-		h.stopEngine(t)
-		h.stopSettlement(t)
-	})
-	return h
+	h.pair = pair
+	h.register = register.NewUseCase(userRepo, hasher, walletRepo, marketCache, txManager)
+	h.deposit = deposit.NewUseCase(walletRepo, marketCache, converter)
+	h.createOrder = createorder.NewUseCase(orderRepo, walletRepo, marketCache, txManager, converter, commandBus)
+	h.cancelOrder = cancelorder.NewUseCase(orderRepo, commandBus)
+	h.getPairBalance = getpairbalance.NewUseCase(walletRepo, marketCache)
+	h.eventBus = eventBus
+	h.engine = engine.NewMatchingEngine(book, commandBus, eventBus, orderRepo, logger)
+	h.settlement = tradeservice.NewSettlementService(
+		eventBus, tradeRepo, orderRepo, walletRepo, marketCache, txManager, logger,
+	)
 }
 
 // startEngine starts the engine; it must be stopped. Commands sent while it is stopped wait
