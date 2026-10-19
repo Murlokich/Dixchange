@@ -80,18 +80,31 @@ func newHarness(t *testing.T) *harness {
 // restart simulates a crash and a restart of the app: everything in memory is lost (the
 // book, the commands waiting in the command bus, the events waiting in the event bus) and
 // the database stays. The components are built again on the same database and started
-// the way cmd/app.go does: the book is loaded before the engine and settlement run.
+// the way cmd/app.go does: settlement first, then the book is loaded, then the engine.
 func (h *harness) restart(t *testing.T) {
 	t.Helper()
 	h.stopEngine(t)
 	h.stopSettlement(t)
 
 	h.build(t)
-	if err := h.engine.LoadOrderBook(context.Background()); err != nil {
+	h.startSettlement()
+	// Like gctx in the app, the load's context ends if settlement stops: the replay
+	// would otherwise wait for an event bus nobody empties.
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-h.settlementRun.done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	err := h.engine.LoadOrderBook(ctx)
+	cancel()
+	if err != nil {
+		h.failIfStopped(t)
 		t.Fatalf("load order book: %v", err)
 	}
 	h.startEngine()
-	h.startSettlement()
 }
 
 // build wires new components on the shared database, as cmd/app.go does, and puts them

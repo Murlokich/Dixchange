@@ -171,18 +171,22 @@ func run(log pkg.Logger) error {
 		log,
 	)
 
-	// Load OrderBook state before starting app
-	if err := matchingEngine.LoadOrderBook(ctx); err != nil {
-		return fmt.Errorf("failed to load order book: %w", err)
-	}
 	// The first member to fail cancels gctx, which stops all the others.
 	g, gctx := errgroup.WithContext(ctx)
-	// Start matching engine and settlement service before any traffic comes in
-	g.Go(func() error {
-		return errors.Wrap(matchingEngine.Run(gctx), "matching engine")
-	})
+	// Start settlement service before loading the engine, so no event bus overloading takes place
 	g.Go(func() error {
 		return errors.Wrap(settlementService.Run(gctx), "settlement service")
+	})
+	// The load runs before the engine and the server, so no extra traffic comes in before the
+	// book is complete.
+	if err := matchingEngine.LoadOrderBook(gctx); err != nil {
+		// LoadOrderBook is called syncrhonously, so to pass error to settlement service
+		// we return it through errorgroup
+		g.Go(func() error { return errors.Wrap(err, "load order book") })
+		return wait(g)
+	}
+	g.Go(func() error {
+		return errors.Wrap(matchingEngine.Run(gctx), "matching engine")
 	})
 
 	regUseCase := register.NewUseCase(userRepo, pwdHasher, balanceRepo, marketCache, txManager)
@@ -239,8 +243,13 @@ func run(log pkg.Logger) error {
 		return nil
 	})
 
-	// Wait returns the first error. On a signal every member returns Canceled, which is
-	// a clean shutdown; otherwise the first error is the failure that started the shutdown.
+	return wait(g)
+}
+
+// wait waits for the group and returns its first error. On a signal every member returns
+// Canceled, which is a clean shutdown; otherwise the first error is the failure that
+// started the shutdown.
+func wait(g *errgroup.Group) error {
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
