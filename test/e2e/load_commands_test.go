@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,4 +51,44 @@ func TestLoadCommands_EngineStopped_ReplaysLog(t *testing.T) {
 	assert.Zero(t, h.commandLogLen(t), "command log")
 	balances = h.balances(t, user)
 	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Main: 78, Reserved: 22}, balances.Quote)
+}
+
+// With settlement stopped the engine keeps placing orders until the event bus is full, so
+// the log can hold more commands than the event bus: their events are lost in the crash.
+// Replaying them publishes more events than the bus holds, which works only because
+// settlement runs during the load and empties it.
+
+func TestLoadCommands_SettlementStopped_ReplaysMoreThanEventBus(t *testing.T) {
+	h := newHarness(t)
+	commands := h.cfg.EventBusConfig.BufferSize + 1
+
+	// Each bid of 1 USD at 1 KCN reserves 1 KCN; bids don't cross.
+	user := h.newUser(t, "", strconv.Itoa(commands))
+
+	// The engine places the first orders until the event bus is full and holds the last
+	// one, waiting to publish its event.
+	h.stopSettlement(t)
+	for i := range commands {
+		err := h.placeOrder(t, user, entity.BuySide, "1", "1")
+		require.NoError(t, err, "order %d of %d", i+1, commands)
+	}
+
+	assert.Empty(t, h.orders(t, user))
+	assert.Equal(t, commands, h.commandLogLen(t), "command log")
+	balances := h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Reserved: int64(commands)}, balances.Quote)
+
+	h.restart(t)
+	h.waitSettled(t)
+
+	open := 0
+	for _, o := range h.orders(t, user) {
+		if o.Status == entity.StatusOpen {
+			open++
+		}
+	}
+	assert.Equal(t, commands, open, "open orders")
+	assert.Zero(t, h.commandLogLen(t), "command log")
+	balances = h.balances(t, user)
+	assert.Equal(t, entity.Balance{SymbolID: h.pair.Quote.ID, Reserved: int64(commands)}, balances.Quote)
 }
