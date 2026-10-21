@@ -44,6 +44,9 @@ type harness struct {
 	// cfg is this harness's copy of testCfg, the config its components were built with.
 	cfg  config.Config
 	pair entity.Pair
+	// deposits is what each user deposited, recorded by depositFunds for the invariants:
+	// the database keeps only balances. It survives a restart, like the database.
+	deposits map[uuid.UUID]funds
 
 	register       *register.UseCase
 	deposit        *deposit.UseCase
@@ -60,19 +63,35 @@ type harness struct {
 }
 
 // newHarness empties the database and starts the engine and settlement on an empty book.
-// Both are stopped when the test ends.
+// When the test ends, it lets everything settle, checks the invariants and stops both.
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	truncate(t)
 
 	// Each harness gets its own copy, so a test can change a field for itself only.
-	h := &harness{cfg: testCfg}
+	h := &harness{cfg: testCfg, deposits: make(map[uuid.UUID]funds)}
 	h.build(t)
 	h.startEngine()
 	h.startSettlement()
 	t.Cleanup(func() {
-		h.stopEngine(t)
-		h.stopSettlement(t)
+		// Deferred, so they stop even when a check below ends the test: they must not
+		// keep running into the next one.
+		defer h.stopSettlement(t)
+		defer h.stopEngine(t)
+
+		// Every test ends with the invariants checked on the settled state. A failed test
+		// is skipped: its state is wrong anyway.
+		if t.Failed() {
+			return
+		}
+		if h.engineRun == nil {
+			h.startEngine()
+		}
+		if h.settlementRun == nil {
+			h.startSettlement()
+		}
+		h.waitSettled(t)
+		h.checkInvariants(t)
 	})
 	return h
 }

@@ -58,6 +58,18 @@ func (h *harness) depositFunds(t *testing.T, userID uuid.UUID, symbolID int, amo
 	if err != nil {
 		t.Fatalf("deposit %s of symbol %d: %v", amount, symbolID, err)
 	}
+
+	// Recorded in minor units, for the invariants.
+	d := h.deposits[userID]
+	switch symbolID {
+	case h.pair.Base.ID:
+		d.Base += value.Shift(int32(h.pair.Base.Precision)).IntPart()
+	case h.pair.Quote.ID:
+		d.Quote += value.Shift(int32(h.pair.Quote.Precision)).IntPart()
+	default:
+		t.Fatalf("deposit of symbol %d: not a symbol of the pair", symbolID)
+	}
+	h.deposits[userID] = d
 }
 
 // placeOrder calls the create order use case on the pair, with quantity and price as
