@@ -35,3 +35,5 @@ go.work.sum
 cmd/__debug_bin*
 
 CLAUDE.md
+# logs of failed randomized e2e runs
+test/e2e/out/

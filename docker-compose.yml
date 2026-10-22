@@ -21,9 +21,9 @@ services:
     # restarted app rebuilds the order book from the DB. Docker backs off between
     # restarts (100ms, doubling, up to 1 minute), so a crash loop doesn't spin.
     restart: on-failure
-    env_file: envs/.env
+    env_file: envs/app/.env
     environment:
-      # Overrides the localhost URL in envs/.env: inside the compose network the
+      # Overrides the localhost URL in envs/app/.env: inside the compose network the
       # database is reachable by its service name.
       DB_URL: "postgresql://developer:password@db:5432/monolith?sslmode=disable"
       HTTP_ADDR: ":8080"

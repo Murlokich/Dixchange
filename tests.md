@@ -45,7 +45,7 @@ microservices.
   hold commands or events back and set up situations that are otherwise a matter of luck
   (for example a cancel that arrives after its order was already matched).
 - **Configuration.** The tests use the application's own configuration, read from
-  `envs/.env`. `envs/e2e.env` overrides the few values the tests deliberately run
+  `envs/app/.env`. `envs/app/e2e.env` overrides the few values the tests deliberately run
   differently (for example cheaper password hashing, which only affects speed).
 
 The tests share one database and one order book, so they don't run in parallel.

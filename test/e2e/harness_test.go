@@ -226,19 +226,22 @@ func startRunner(run func(ctx context.Context) error) *runner {
 	return r
 }
 
-// stop cancels the component and waits for it to return. Returning because of the cancel
-// is a clean stop; any other error fails the test. A nil runner (never started, or
-// already stopped) does nothing.
+// stop cancels the component and waits for it to return. A component that had already
+// returned by itself fails the test. Whatever it returns after the cancel is caused by
+// it, so it is a clean stop: not always context.Canceled, since pgx reports a query cut
+// short by the cancel as an i/o timeout. A nil runner (never started, or already stopped)
+// does nothing.
 func (r *runner) stop(t *testing.T, name string) {
 	t.Helper()
 	if r == nil {
 		return
 	}
+	if err := r.stoppedWith(); err != nil {
+		t.Errorf("%s stopped by itself: %v", name, err)
+		return
+	}
 	r.cancel()
 	<-r.done
-	if r.err != nil && !errors.Is(r.err, context.Canceled) {
-		t.Errorf("%s stopped with error: %v", name, r.err)
-	}
 }
 
 // stoppedWith returns the error the component stopped with, or nil while it still runs.

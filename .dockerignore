@@ -5,7 +5,7 @@
 .idea
 
 # secrets: configuration comes from the environment at run time
-envs/.env
+envs/app/.env
 
 *.out
 coverage.*
