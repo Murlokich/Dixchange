@@ -32,7 +32,7 @@ const migrationsURL = "file://../../migrations"
 
 var (
 	// testCfg is the app's own config, read from the environment like cmd/app.go does:
-	// make test-e2e loads envs/.env with envs/e2e.env taking precedence. Only
+	// make test-e2e loads envs/app/.env with envs/app/e2e.env taking precedence. Only
 	// the database URL is ignored; the container provides it.
 	testCfg config.Config //nolint:gochecknoglobals // set by TestMain, which can't pass values to tests
 	// testDB is shared by every test of the package. The tests share one order book table

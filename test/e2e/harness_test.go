@@ -14,6 +14,7 @@ import (
 
 	"github.com/dixchange/Monolith/internal/auth/adapter/crypto/argon2"
 	authSQL "github.com/dixchange/Monolith/internal/auth/adapter/sql"
+	"github.com/dixchange/Monolith/internal/config"
 	"github.com/dixchange/Monolith/internal/domain/entity"
 	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
 	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
@@ -40,7 +41,12 @@ const pairID = 1
 // use cases directly. The engine and settlement run in the background and can be stopped
 // and started again, so a test can hold commands or events back to set up a race.
 type harness struct {
+	// cfg is this harness's copy of testCfg, the config its components were built with.
+	cfg  config.Config
 	pair entity.Pair
+	// deposits is what each user deposited, recorded by depositFunds for the invariants:
+	// the database keeps only balances. It survives a restart, like the database.
+	deposits map[uuid.UUID]funds
 
 	register       *register.UseCase
 	deposit        *deposit.UseCase
@@ -57,10 +63,73 @@ type harness struct {
 }
 
 // newHarness empties the database and starts the engine and settlement on an empty book.
-// Both are stopped when the test ends.
+// When the test ends, it lets everything settle, checks the invariants and stops both.
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	truncate(t)
+
+	// Each harness gets its own copy, so a test can change a field for itself only.
+	h := &harness{cfg: testCfg, deposits: make(map[uuid.UUID]funds)}
+	h.build(t)
+	h.startEngine()
+	h.startSettlement()
+	t.Cleanup(func() {
+		// Deferred, so they stop even when a check below ends the test: they must not
+		// keep running into the next one.
+		defer h.stopSettlement(t)
+		defer h.stopEngine(t)
+
+		// Every test ends with the invariants checked on the settled state. A failed test
+		// is skipped: its state is wrong anyway.
+		if t.Failed() {
+			return
+		}
+		if h.engineRun == nil {
+			h.startEngine()
+		}
+		if h.settlementRun == nil {
+			h.startSettlement()
+		}
+		h.waitSettled(t)
+		h.checkInvariants(t)
+	})
+	return h
+}
+
+// restart simulates a crash and a restart of the app: everything in memory is lost (the
+// book, the commands waiting in the command bus, the events waiting in the event bus) and
+// the database stays. The components are built again on the same database and started
+// the way cmd/app.go does: settlement first, then the book is loaded, then the engine.
+func (h *harness) restart(t *testing.T) {
+	t.Helper()
+	h.stopEngine(t)
+	h.stopSettlement(t)
+
+	h.build(t)
+	h.startSettlement()
+	// Like gctx in the app, the load's context ends if settlement stops: the replay
+	// would otherwise wait for an event bus nobody empties.
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-h.settlementRun.done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	err := h.engine.LoadOrderBook(ctx)
+	cancel()
+	if err != nil {
+		h.failIfStopped(t)
+		t.Fatalf("load order book: %v", err)
+	}
+	h.startEngine()
+}
+
+// build wires new components on the shared database, as cmd/app.go does, and puts them
+// in h, replacing any previous ones. Nothing is started.
+func (h *harness) build(t *testing.T) {
+	t.Helper()
 	ctx := context.Background()
 
 	logrusLogger := logrus.New()
@@ -82,34 +151,23 @@ func newHarness(t *testing.T) *harness {
 	}
 	txManager := pkg.NewTXManager(testDB)
 	converter := service.NewConverter()
-	// Each harness gets its own copy, so a test can change a field for itself only.
-	cfg := testCfg
-	hasher := argon2.NewArgon2(&cfg.Argon2Config)
+	hasher := argon2.NewArgon2(&h.cfg.Argon2Config)
 
-	commandBus := commandbus.NewCommandBus(&cfg.CommandBusConfig)
-	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&cfg.EventBusConfig)}
-	book := orderbook.NewBook(&cfg.OrderBookConfig, pair)
+	commandBus := commandbus.NewCommandBus(&h.cfg.CommandBusConfig)
+	eventBus := &trackedEventBus{EventBus: eventbus.NewEventBus(&h.cfg.EventBusConfig)}
+	book := orderbook.NewBook(&h.cfg.OrderBookConfig, pair)
 
-	h := &harness{
-		pair:           pair,
-		register:       register.NewUseCase(userRepo, hasher, walletRepo, marketCache, txManager),
-		deposit:        deposit.NewUseCase(walletRepo, marketCache, converter),
-		createOrder:    createorder.NewUseCase(orderRepo, walletRepo, marketCache, txManager, converter, commandBus),
-		cancelOrder:    cancelorder.NewUseCase(orderRepo, commandBus),
-		getPairBalance: getpairbalance.NewUseCase(walletRepo, marketCache),
-		eventBus:       eventBus,
-		engine:         engine.NewMatchingEngine(book, commandBus, eventBus, orderRepo, logger),
-		settlement: tradeservice.NewSettlementService(
-			eventBus, tradeRepo, orderRepo, walletRepo, marketCache, txManager, logger,
-		),
-	}
-	h.startEngine()
-	h.startSettlement()
-	t.Cleanup(func() {
-		h.stopEngine(t)
-		h.stopSettlement(t)
-	})
-	return h
+	h.pair = pair
+	h.register = register.NewUseCase(userRepo, hasher, walletRepo, marketCache, txManager)
+	h.deposit = deposit.NewUseCase(walletRepo, marketCache, converter)
+	h.createOrder = createorder.NewUseCase(orderRepo, walletRepo, marketCache, txManager, converter, commandBus)
+	h.cancelOrder = cancelorder.NewUseCase(orderRepo, commandBus)
+	h.getPairBalance = getpairbalance.NewUseCase(walletRepo, marketCache)
+	h.eventBus = eventBus
+	h.engine = engine.NewMatchingEngine(book, commandBus, eventBus, orderRepo, logger)
+	h.settlement = tradeservice.NewSettlementService(
+		eventBus, tradeRepo, orderRepo, walletRepo, marketCache, txManager, logger,
+	)
 }
 
 // startEngine starts the engine; it must be stopped. Commands sent while it is stopped wait
@@ -168,19 +226,22 @@ func startRunner(run func(ctx context.Context) error) *runner {
 	return r
 }
 
-// stop cancels the component and waits for it to return. Returning because of the cancel
-// is a clean stop; any other error fails the test. A nil runner (never started, or
-// already stopped) does nothing.
+// stop cancels the component and waits for it to return. A component that had already
+// returned by itself fails the test. Whatever it returns after the cancel is caused by
+// it, so it is a clean stop: not always context.Canceled, since pgx reports a query cut
+// short by the cancel as an i/o timeout. A nil runner (never started, or already stopped)
+// does nothing.
 func (r *runner) stop(t *testing.T, name string) {
 	t.Helper()
 	if r == nil {
 		return
 	}
+	if err := r.stoppedWith(); err != nil {
+		t.Errorf("%s stopped by itself: %v", name, err)
+		return
+	}
 	r.cancel()
 	<-r.done
-	if r.err != nil && !errors.Is(r.err, context.Canceled) {
-		t.Errorf("%s stopped with error: %v", name, r.err)
-	}
 }
 
 // stoppedWith returns the error the component stopped with, or nil while it still runs.

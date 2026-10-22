@@ -85,13 +85,15 @@ func (s *SettlementService) Run(ctx context.Context) error {
 	}
 }
 
-// settlePlacement puts the placed order into the orders and settles the trades it produced.
+// settlePlacement puts the placed order into the orders and settles the trades it produced,
+// in one transaction: the command leaves the log, and the order and every trade reach the
+// orders, together or not at all.
 //
-// The order is inserted and its command removed from the command log in one transaction,
-// before any trade: the command must not outlive the order's first appearance in the
-// orders, or replaying the log would place the order a second time. Each trade is then
-// settled in its own transaction, and a trade that fails stops the rest: the trades left
-// unsettled are matched again once the engine is reloaded from the orders.
+// With the trades in separate transactions, a crash between them left the new order and
+// its counterparties active in the orders with unfilled quantities that cross, and
+// recovery then failed on "unexpected trade produced by resting orders" on every start.
+// A trade that fails now rolls the whole placement back: the command stays in the log and
+// is replayed on the next start.
 func (s *SettlementService) settlePlacement(ctx context.Context, event eventbus.OrderPlaced) error {
 	fn := func(ctx context.Context) error {
 		command, err := s.orderRepo.TakeOrderCommand(ctx, event.CommandID)
@@ -105,17 +107,17 @@ func (s *SettlementService) settlePlacement(ctx context.Context, event eventbus.
 		if err = s.orderRepo.CreateOrder(ctx, order); err != nil {
 			return pkgerrors.Wrap(err, "order repo create order")
 		}
+
+		for i := range event.Trades {
+			if err = s.applyTrade(ctx, event.Trades[i]); err != nil {
+				return pkgerrors.Wrapf(err, "apply trade of bid order %s and ask order %s",
+					event.Trades[i].Bid.OrderID, event.Trades[i].Ask.OrderID)
+			}
+		}
 		return nil
 	}
 	if err := s.txManager.WithTX(ctx, fn); err != nil {
 		return pkgerrors.Wrap(err, "tx manager with tx")
-	}
-
-	for i := range event.Trades {
-		if err := s.executeTrade(ctx, event.Trades[i]); err != nil {
-			return pkgerrors.Wrapf(err, "execute trade of bid order %s and ask order %s",
-				event.Trades[i].Bid.OrderID, event.Trades[i].Ask.OrderID)
-		}
 	}
 	return nil
 }
@@ -191,11 +193,10 @@ func (s *SettlementService) executeCancellation(ctx context.Context, commandID u
 	return nil
 }
 
-// executeTrade settles a single trade: it records the trade, moves the funds between
-// the participants and updates the filled quantity of both orders. The whole
-// settlement is applied within one transaction, so a trade is either fully settled
-// or not settled at all.
-func (s *SettlementService) executeTrade(ctx context.Context, trade entity.Trade) error {
+// applyTrade settles a single trade: it records the trade, moves the funds between the
+// participants and updates the filled quantity of both orders. It runs in the caller's
+// transaction (see settlePlacement).
+func (s *SettlementService) applyTrade(ctx context.Context, trade entity.Trade) error {
 	// trade history pages by trade ID, which relies on UUIDv7 IDs being time ordered
 	id, idErr := uuid.NewV7()
 	if idErr != nil {
@@ -208,48 +209,40 @@ func (s *SettlementService) executeTrade(ctx context.Context, trade entity.Trade
 		return pkgerrors.Wrap(notionalErr, "trade notional")
 	}
 
-	fn := func(ctx context.Context) error {
-		if err := s.tradeRepo.CreateTrade(ctx, trade); err != nil {
-			return pkgerrors.Wrap(err, "trade repo create trade")
-		}
-
-		// The buyer pays the quote asset, the seller pays the base asset. Both were
-		// reserved when the orders were created.
-		if err := s.walletRepo.TransferFunds(
-			ctx,
-			trade.Bid.UserID,
-			trade.Ask.UserID,
-			trade.MarketPair.Quote.ID,
-			notional,
-		); err != nil {
-			return pkgerrors.Wrap(err, "wallet repo transfer quote funds")
-		}
-		if err := s.walletRepo.TransferFunds(
-			ctx,
-			trade.Ask.UserID,
-			trade.Bid.UserID,
-			trade.MarketPair.Base.ID,
-			trade.Quantity,
-		); err != nil {
-			return pkgerrors.Wrap(err, "wallet repo transfer base funds")
-		}
-
-		if err := s.releaseExcessReservation(ctx, trade); err != nil {
-			return pkgerrors.Wrap(err, "release excess reservation")
-		}
-
-		if err := s.orderRepo.FillOrder(ctx, trade.Bid.OrderID, trade.Quantity); err != nil {
-			return pkgerrors.Wrap(err, "order repo fill bid order")
-		}
-		if err := s.orderRepo.FillOrder(ctx, trade.Ask.OrderID, trade.Quantity); err != nil {
-			return pkgerrors.Wrap(err, "order repo fill ask order")
-		}
-
-		return nil
+	if err := s.tradeRepo.CreateTrade(ctx, trade); err != nil {
+		return pkgerrors.Wrap(err, "trade repo create trade")
 	}
 
-	if err := s.txManager.WithTX(ctx, fn); err != nil {
-		return pkgerrors.Wrap(err, "tx manager with tx")
+	// The buyer pays the quote asset, the seller pays the base asset. Both were
+	// reserved when the orders were created.
+	if err := s.walletRepo.TransferFunds(
+		ctx,
+		trade.Bid.UserID,
+		trade.Ask.UserID,
+		trade.MarketPair.Quote.ID,
+		notional,
+	); err != nil {
+		return pkgerrors.Wrap(err, "wallet repo transfer quote funds")
+	}
+	if err := s.walletRepo.TransferFunds(
+		ctx,
+		trade.Ask.UserID,
+		trade.Bid.UserID,
+		trade.MarketPair.Base.ID,
+		trade.Quantity,
+	); err != nil {
+		return pkgerrors.Wrap(err, "wallet repo transfer base funds")
+	}
+
+	if err := s.releaseExcessReservation(ctx, trade); err != nil {
+		return pkgerrors.Wrap(err, "release excess reservation")
+	}
+
+	if err := s.orderRepo.FillOrder(ctx, trade.Bid.OrderID, trade.Quantity); err != nil {
+		return pkgerrors.Wrap(err, "order repo fill bid order")
+	}
+	if err := s.orderRepo.FillOrder(ctx, trade.Ask.OrderID, trade.Quantity); err != nil {
+		return pkgerrors.Wrap(err, "order repo fill ask order")
 	}
 
 	return nil

@@ -56,4 +56,15 @@ jobs:
           go-version: '1.26'
 
       - name: Run e2e tests
-        run: make test-e2e E2E_ENV_FILES=envs/e2e.env,envs/.env.github_runner
+        run: make test-e2e E2E_APP_ENV=envs/app/.env.github_runner
+
+      # A failed randomized run writes its steps to test/e2e/out (see randomized_test.go);
+      # kept with the run so it can be downloaded from the run's summary page.
+      - name: Upload randomized suite logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: randomized-logs
+          path: test/e2e/out/
+          if-no-files-found: ignore
+          retention-days: 14

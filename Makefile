@@ -13,9 +13,11 @@ fmt:  ## Format the code
 test: ## Run tests and display coverage
 	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
 
-# The env files test-e2e loads; the first listed file wins (godotenv), so envs/e2e.env
-# overrides the app's own config. CI passes its own: make test-e2e E2E_ENV_FILES=...
-E2E_ENV_FILES ?= envs/e2e.env,envs/.env
+# The env files test-e2e loads; the first listed file wins (godotenv): the tests' own
+# settings, then the app config the e2e tests run differently, then the app config itself.
+# CI has no envs/app/.env and passes its own: make test-e2e E2E_APP_ENV=...
+E2E_APP_ENV ?= envs/app/.env
+E2E_ENV_FILES = envs/tests/e2e.env,envs/app/e2e.env,$(E2E_APP_ENV)
 
 test-e2e: ## Run e2e tests (needs Docker)
 	@go tool godotenv -f $(E2E_ENV_FILES) \
