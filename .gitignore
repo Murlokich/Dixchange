@@ -37,3 +37,7 @@ cmd/__debug_bin*
 CLAUDE.md
 # logs of failed randomized e2e runs
 test/e2e/out/
+
+# personal notes, kept out of the repository
+bugs.md
+recovery.md

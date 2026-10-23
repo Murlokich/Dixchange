@@ -2,7 +2,7 @@
 
 - `app/`: configuration of the application, one file per environment.
   - `.env`: local development and docker-compose. Not committed: it holds secrets (JWT keys).
-    Start from `.env.example`.
+    Create it with `make env` (from `.env.example`, with new JWT keys).
   - `.env.example`: template of `.env`, without secrets.
   - `.env.github_runner`: replaces `.env` in the e2e job of the GitHub workflow; no secrets.
   - `e2e.env`: the few app settings the e2e tests deliberately run differently (e.g. cheaper

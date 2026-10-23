@@ -13,11 +13,13 @@ When a new order arrives, the engine looks at the opposite side: if the best res
 Everything below exists to make these two guarantees — price priority and time priority — cheap to enforce as order volume grows.
 
 ## 2. Interface
+```go
+NewBook(cfg *config.OrderBook, pair entity.Pair) *Book       // empty book for one market pair; cfg sets the B-tree degree
+AddOrder(order *Order) ([]Trade, error)                      // match the order, rest the remainder, return the trades
+CancelOrder(id uuid.UUID) (bool, error)                      // remove a resting order; false if it isn't in the book
 ```
-LoadMatchingEngine() *MatchingEngine // Creating matching engine based on orders in persistent storage
-AddOrder(order Order) []Trade // Add new order and return matching trades
-CancelOrder(id UUID) bool // Try to cancel order and reutrn the result
-```
+
+The book is built empty. Rebuilding it from the database after a restart is done by the matching engine (`MatchingEngine.LoadOrderBook`), which inserts the active orders with `AddOrder`.
 
 ## 3. Operations we need
 For the interface above to be fast, the underlying structure(s) must support:
@@ -86,22 +88,28 @@ Tests are table-driven Go tests living in `package orderbook`, giving white-box 
 Each test case is a sequence of **steps** (`AddOrder` or `CancelOrder` calls), and every step asserts the trades it produced *immediately*, not just the book's state at the end. `AddOrder` already returns `[]Trade`, so checking only the final resting-order count would discard the more important signal of what actually traded.
 
 ```go
-type step struct {
-    add        *Order   // nil if this step is a cancel
-    cancelID   uuid.UUID
-    wantTrades []Trade
+type testCase struct {
+    steps          []step
+    finalBookState finalBookState
 }
 
-type testCase struct {
-    name     string
-    steps    []step
-    wantAsks []PriceLevel // or a simplified summary: map[price]totalQty
-    wantBids []PriceLevel
+type step struct {
+    order          *Order     // set for an AddOrder step
+    cancelID       *uuid.UUID // set for a CancelOrder step
+    wantTrades     []Trade
+    topAskQuantity *int64 // if nil - don't check it
+    topBidQuantity *int64 // if nil - don't check it
+}
+
+type finalBookState struct {
+    asksShape map[int64]int // map from price level to number of orders
+    bidsShape map[int64]int // map from price level to number of orders
+    orderIDs  []uuid.UUID
 }
 ```
 
 ## 7.2 Core mechanism cases
-Each case below exercises a distinct branch or invariant in `book.go` / `order.go`, chosen to isolate one mechanism per case rather than bundle several into a single "market story" (see 7.4 for why story-shaped scenarios were cut).
+Each case below exercises a distinct branch or invariant in `book.go` / `order.go`, chosen to isolate one mechanism per case rather than bundle several into a single "market story".
 
 1. **Order walks multiple price levels** — one incoming order consumes several resting price levels in a single `AddOrder` call; trades must be emitted in strict price-priority order, and any leftover quantity rests at its own price. Exercises the `for oppositeSide.Len() > 0` loop directly — the most important case in the suite. `TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels`.
 2. **Large resting order filled incrementally** — a big resting order is partially filled by several independent, later `AddOrder` calls. Verifies the order keeps its FIFO position (`Front()` of its price level's list) across separate calls, since a partial fill never removes the list node. `TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall`.
@@ -110,23 +118,3 @@ Each case below exercises a distinct branch or invariant in `book.go` / `order.g
 5. **Cancel — price level survives** — cancel one order out of several resting at the same price; the level and the remaining orders must be untouched. `TestBook_AddOrder_CancelOrder_PriceLevelSurvives`.
 6. **Cancel — price level removed** — cancel the last order at a price level; the level itself must be deleted from the tree, not just left empty. `TestBook_AddOrder_CancelOrder_PriceLevelRemoved`.
 7. **Double cancel** — cancelling the same ID twice; the second call returns `false`. `TestBook_CancelOrder_DoubleCancellation`.
-
-## 7.3 Property-based testing (separate, later)
-Randomized order flow (e.g. orders generated within `K ± K/10` of a midpoint) doesn't fit the table format above — there's no hand-computable expected trade list for random input. If pursued, this belongs in its own test using generated input and invariant checks (quantity conservation, no negative `RemainingQuantity`, book stays price-sorted) rather than exact expected-output matching. Deferred until the core mechanism suite in 7.2 is in place.
-
-## 7.4 Cut from the initial brainstorm
-Several originally-proposed scenarios ("narrowing," "disbalance," "spike," and combinations thereof) were story-shaped compositions of the mechanism cases in 7.2 — they don't exercise any code path the atomic cases above don't already cover, so they were folded in rather than kept as separate cases.
-
-Five more cases were planned as dedicated tests but turned out to already be covered as a side effect of the cases in 7.2, so they were cut rather than duplicated:
-
-* **Boundary price equality** — already hit in `TestBook_AddOrder_RestingBigOrderMatchesMultipleSmall`: one order sells at exactly the resting bid's price (90 vs. 90), landing on the `<=`/`>=` equality edge in `IsSatisfactoryPrice`, not just an approximation of it.
-* **Trade field correctness, both directions** — already hit by combining two existing tests. `TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels`/`RestingBigOrderMatchesMultipleSmall` have resting=ask, incoming=bid, exercising `executeTrade`'s `else` branch; `TestBook_AddOrder_FIFO` has resting=bid, incoming=ask, exercising the `if restingOrder.Side == entity.BuySide` branch. Between them, both sides of that branch are covered.
-* **Trade executes at the resting order's price** — already hit in `TestBook_AddOrder_BigOrderMatchesMultiplePriceLevels`: the incoming buy has limit 81, but the asserted trade prices are 78/79/80 (the resting asks' own prices), proving price improvement rather than assuming it.
-* **Cancel after full match fails** — code-path-identical to double cancel. Once an order fully fills, `createTradesForPriceLevel` deletes it from `b.orders` the same way a normal cancel does; either way a later `CancelOrder` call hits the same `if !ok { return false, nil }` guard already exercised by `TestBook_CancelOrder_DoubleCancellation`. Different business story, same branch.
-* **Cancel then cross** — a composition of two already-independently-tested mechanisms (`CancelOrder`'s list removal, and FIFO-front matching), not a distinct branch. `container/list.Remove` fully detaches a cancelled node, so there's no secondary cache that could resurrect it in a later match — low enough residual risk to skip a dedicated test.
-
-## 7.5 Open question: concurrency
-`Book` currently has no internal synchronization. The test plan above assumes sequential, single-caller access. Before writing tests that assume this, confirm whether `Book` is meant to be owned by a single goroutine (e.g. one per trading pair) or must be safe under concurrent `AddOrder`/`CancelOrder` calls — the latter would need its own `-race`-covered test, separate from this suite.
-
-## 7.6 Deferred
-Load/volume testing (many thousands of orders on one side or one price level) is a performance concern, not a correctness one, and is deferred to a dedicated load-testing pass.

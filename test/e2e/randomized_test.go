@@ -28,7 +28,7 @@ import (
 // Each user trades on one side only (the engine doesn't prevent self-trades), and deposits
 // enough to pay for every command at the largest size, so a create can't run out of funds.
 // A cancel picks one of the user's active orders as they are in the orders table at that
-// moment: create returns no order id (see bugs.md).
+// moment: create returns no order id.
 //
 // The seed reproduces the users' sides and the commands: their users, kinds, quantities and
 // prices. Which order a cancel picks also depends on what was settled by then, so it can
