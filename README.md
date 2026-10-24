@@ -17,7 +17,7 @@ testcontainers.
 
 ```mermaid
 flowchart TB
-    client[Client] -->|HTTP| handlers[HTTP handlers]
+    client[Client] --> handlers[HTTP handlers]
     handlers --> usecases[create_order / cancel_order<br/>use cases<br/>validate input]
     usecases -->|"step 3: take a slot"| commandBus[[Command bus<br/>bounded queue]]
     usecases -->|"step 4: one tx:<br/>reserve funds,<br/>log the command"| db[(PostgreSQL)]
