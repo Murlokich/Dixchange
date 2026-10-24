@@ -16,18 +16,18 @@ testcontainers.
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     client[Client] -->|HTTP| handlers[HTTP handlers]
-    handlers --> usecases[create_order / cancel_order<br/>use cases]
-    usecases -->|"(1) take a slot"| commandBus[[Command bus<br/>bounded queue]]
-    usecases -->|"(2) tx: reserve funds +<br/>insert into command log"| db[(PostgreSQL)]
-    usecases -->|"(3) send after commit"| commandBus
+    handlers --> usecases[create_order / cancel_order<br/>use cases<br/>validate input]
+    usecases -->|"step 3: take a slot"| commandBus[[Command bus<br/>bounded queue]]
+    usecases -->|"step 4: one tx:<br/>reserve funds,<br/>log the command"| db[(PostgreSQL)]
+    usecases -->|"step 5: send"| commandBus
     commandBus --> engine[Matching engine<br/>single goroutine]
     engine <--> book[(In-memory<br/>order book)]
-    engine -->|one event per command| eventBus[[Event bus]]
+    engine -->|"step 6: one event<br/>per command"| eventBus[[Event bus]]
     eventBus --> settlement[Settlement service]
-    settlement -->|one tx per event| db
-    db -. on startup: active orders<br/>+ command log .-> engine
+    settlement -->|"step 7: one tx per event:<br/>take the command from the log,<br/>save the order and trades,<br/>transfer funds,<br/>release reservations"| db
+    db -. recovery on startup .-> engine
 ```
 
 Placing an order:
@@ -173,46 +173,9 @@ Details: [tests.md](tests.md).
 
 ## Auth
 
-- **Passwords** are hashed with Argon2id (`internal/auth/adapter/crypto/argon2`) with a random
-  16-byte salt per password. The salt and the parameters (memory, iterations, threads) are
-  stored with the hash, in the form `$argon2id$v=19$m=65536,t=1,p=1$<salt>$<hash>`, so a hash
-  stays verifiable after the parameters change. Verification recomputes the hash with the
-  stored parameters and compares in constant time.
-- **Login** validates the credentials and issues an RS256-signed JWT (subject: the user id,
-  valid for 7 days). The server sets it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie
-  named `access_token`; it isn't returned in the response body.
-- **Protected endpoints** accept the token either in an `Authorization: Bearer` header or in
-  the cookie; the header wins when both are present. The auth middleware validates the
-  signature and expiry and takes the user id from the subject. Login only sets the cookie,
-  so a non-browser client takes the token from the `Set-Cookie` response header.
-- **CORS** allows credentials from the frontend origin (`HTTP_FRONTEND_HOST`, default
-  `http://localhost:5173`).
-
-Why a cookie:
-
-- An `HttpOnly` cookie keeps the token out of reach of JavaScript, and the browser handles
-  session persistence by itself.
-- The backend already issued JWT access tokens, so putting that token into a cookie was the
-  smallest change.
-- Chrome and Firefox accept `Secure` cookies from `http://localhost`, so local development
-  works without TLS.
-
-Trade-offs: there is no CSRF protection, and there is a single long-lived token with no
-refresh or revocation.
-
-## Known limitations
-
-- **One market pair.** The app runs a single order book for a hardcoded pair
-  (`defaultMarketPairID` in `cmd/app.go`).
-- **No self-trade prevention.** A user's buy can match their own sell.
-- **Create returns no order id, and an early cancel is dropped.** A client learns the id of
-  its order only from the order list once the order is settled, and a cancel sent before
-  then is silently dropped: the ownership check reads the orders table, which the order
-  reaches only after settlement.
-- **No CSRF protection** (see [Auth](#auth)).
-- **Crash loop on a poison command.** A command whose settlement fails deterministically
-  fails again on every replay, so the app keeps restarting.
-- **A single long-lived JWT** (7 days), without refresh tokens or revocation.
+Login issues an RS256-signed JWT and sets it in an `HttpOnly` cookie (`access_token`).
+Protected endpoints accept the token from that cookie or from an `Authorization: Bearer`
+header. Passwords are hashed with Argon2id and a random salt per password.
 
 ## Docs
 
