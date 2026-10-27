@@ -1,4 +1,4 @@
-.PHONY: help fmt test test-e2e gen lint infra-up rebuild-up up down
+.PHONY: help fmt env test test-e2e gen lint infra-up rebuild-up up down
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -8,6 +8,20 @@ help:  ## Show this help message
 fmt:  ## Format the code
 	@goimports -w .
 	@gofmt -s -w .
+
+# The app's env file for local runs and docker compose; not committed, it holds the JWT keys.
+ENV_FILE ?= envs/app/.env
+
+env: ## Create envs/app/.env from .env.example with new JWT keys (never overwrites)
+	@if [ -e $(ENV_FILE) ]; then echo "$(ENV_FILE) already exists, not overwriting it"; exit 1; fi
+	@keys=$$(mktemp -d) && trap 'rm -rf "$$keys"' EXIT && \
+		openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$$keys/private.pem" 2>/dev/null && \
+		openssl pkey -in "$$keys/private.pem" -pubout -out "$$keys/public.pem" && \
+		sed -e "s|^JWT_PRIVATE_KEY_B64=.*|JWT_PRIVATE_KEY_B64=$$(openssl base64 -A -in "$$keys/private.pem")|" \
+			-e "s|^JWT_PUBLIC_KEY_B64=.*|JWT_PUBLIC_KEY_B64=$$(openssl base64 -A -in "$$keys/public.pem")|" \
+			envs/app/.env.example > "$$keys/.env" && \
+		mv "$$keys/.env" $(ENV_FILE) && \
+		echo "created $(ENV_FILE)"
 
 
 test: ## Run tests and display coverage
