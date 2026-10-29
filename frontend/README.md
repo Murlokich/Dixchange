@@ -1,48 +1,56 @@
 # Frontend
 
-This repo now starts as a small, documented frontend foundation for a trading platform.
+The web UI of the trading platform: a React single-page app that talks to the backend in the
+repository root over its JSON API. The decision log lives in
+[docs/frontend-foundation.md](docs/frontend-foundation.md).
 
-The decision log lives in [docs/frontend-foundation.md](docs/frontend-foundation.md).
+## Pages
 
-## Runtime
+- **Login** (`/`): sign in, or sign up (which registers the user and then signs in). The
+  backend sets the `access_token` cookie; every API request is sent with credentials.
+- **Dashboard** (`/dashboard`): balances of the selected pair with a deposit dialog, open
+  orders, a dialog to place a limit order, and the latest trades with the full, paginated
+  trade history in a dialog. The *Portfolio value*, *24h P/L* and *Total trades* tiles are
+  static placeholders.
 
-- Node.js 24
+Balances, open orders and trades are refreshed by polling (`src/lib/usePolling.ts`).
 
-## Backend host
+## Configuration
 
-- Copy [envs/.env.example](envs/.env.example) to `envs/.env` and fill in the values.
-- The app reads `VITE_BACKEND_HOST` from that file and uses it for the sign-up POST request.
-- `VITE_BALANCE_POLL_INTERVAL_MS` sets how often the dashboard refreshes balances (default 5000, minimum 1000).
-- `VITE_ORDERS_POLL_INTERVAL_MS` sets how often the dashboard refreshes open orders (default 5000, minimum 1000).
-- `VITE_TRADES_POLL_INTERVAL_MS` sets how often the dashboard refreshes the latest trades (default 5000, minimum 1000).
+Copy [envs/.env.example](envs/.env.example) to `envs/.env` and fill in the values:
 
-## Current screen
+- `VITE_BACKEND_HOST`: base URL of the backend as the browser sees it, without a trailing
+  slash; `http://localhost:8080` for the local setup.
+- `VITE_BALANCE_POLL_INTERVAL_MS`, `VITE_ORDERS_POLL_INTERVAL_MS`,
+  `VITE_TRADES_POLL_INTERVAL_MS`: how often the dashboard refreshes balances, open orders and
+  the latest trades (default 5000, minimum 1000).
 
-- Login page design with email and password fields.
-- Primary sign in action and secondary sign up action.
-- Sign up now posts to `POST /api/auth/register` on the configured backend host.
+Vite inlines these values into the bundle at build time, so a change needs a rebuild (or a
+restart of the dev server).
+
+The backend accepts cross-origin requests only from `http://localhost:5173` by default
+(`HTTP_FRONTEND_HOST`), so the UI must be served on that port: the dev server and the Docker
+container both use it.
+
+## Running
+
+With Docker, from the repository root: `make up` builds this directory's image together with
+the backend and serves the UI at http://localhost:5173. The image builds the app from
+`envs/.env` and serves the static files with nginx (`Dockerfile`, `nginx.conf`); after
+changing `envs/.env`, rebuild it with `make rebuild-up`.
+
+For development, run the backend only (`docker compose up -d db app` in the root) and the Vite
+dev server here. Requires Node.js 24 (`.nvmrc`).
+
+- `npm install`
+- `npm run dev`: dev server on http://localhost:5173
+- `npm run build`: type-check and build into `dist/`
+- `npm run lint`, `npm run typecheck`, `npm run format`
+- `npm run test`: Vitest and React Testing Library
 
 ## Stack
 
-- Vite for fast local development and production builds.
-- React 19 with TypeScript for the UI layer.
-- ESLint 9 flat config and Prettier for formatting and static checks.
-- Vitest and React Testing Library for unit-level coverage.
-
-## Why this shape
-
-- The codebase stays small and explicit, which makes it easier for people and agents to reason about.
-- SSE and WebSocket integrations will live behind a thin realtime client layer so the rest of the app does not care which transport is used.
-- Path aliases and a strict TypeScript setup keep imports predictable as the app grows.
-
-## Commands
-
-- `npm install`
-- `npm run dev`
-- `npm run build`
-- `npm run lint`
-- `npm run test`
-
-## Next step
-
-The next iteration should wire the login form to your backend contract.
+- Vite for local development and production builds.
+- React 19 with TypeScript (strict) and React Router.
+- ESLint 9 flat config and Prettier for static checks and formatting.
+- Vitest and React Testing Library for unit-level tests.

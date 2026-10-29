@@ -32,3 +32,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    # Built from frontend/envs/.env. VITE_BACKEND_HOST is the API address as the browser
+    # sees it (http://localhost:8080), not the compose service name.
+    build: frontend
+    restart: unless-stopped
+    # The Vite dev server's port: the app's default CORS origin (HTTP_FRONTEND_HOST)
+    # covers both. For npm run dev, start only db and app: docker compose up -d db app
+    ports:
+      - "5173:80"
+    depends_on:
+      - app

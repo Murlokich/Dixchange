@@ -4,6 +4,9 @@
 .vscode
 .idea
 
+# the frontend has its own image (frontend/Dockerfile)
+frontend
+
 # secrets: configuration comes from the environment at run time
 envs/app/.env
 

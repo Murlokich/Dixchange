@@ -4,8 +4,7 @@ This document captures the first-step decisions for the trading platform fronten
 
 ## Goals
 
-- Keep the repository easy to reason about for both humans and coding agents.
-- Leave room for realtime market data delivery over SSE or WebSockets.
+- Keep the frontend easy to reason about for both humans and coding agents.
 - Establish a strict, modern TypeScript toolchain without pulling in unnecessary app complexity.
 - Standardize on Node.js 24 for local development and CI parity.
 
@@ -13,7 +12,7 @@ This document captures the first-step decisions for the trading platform fronten
 
 ### Node.js 24
 
-The project is pinned to Node 24 through the root package metadata and `.nvmrc`. That gives a clear runtime target for the frontend tooling and avoids drifting between developer machines.
+The project is pinned to Node 24 through `engines` in `package.json` and `.nvmrc`. That gives a clear runtime target for the frontend tooling and avoids drifting between developer machines.
 
 ### Vite
 
@@ -31,24 +30,21 @@ ESLint handles code quality rules and Prettier handles formatting. The combinati
 
 This is the smallest practical test stack for a Vite app. It gives a fast feedback loop and keeps tests close to user-visible behavior.
 
-## Realtime strategy
+## Data refresh
 
-The frontend should not care whether a market feed comes from SSE or WebSockets. The next step will be to introduce a small transport layer with a shared message contract and adapter-style implementations.
-
-That design keeps the rest of the app stable when the backend transport changes.
+The backend has no push channel, so the dashboard polls: `usePolling` (`src/lib/usePolling.ts`) refetches balances, open orders and the latest trades on an interval configured per data set in `envs/.env`.
 
 ## Project structure
 
-- `src/` contains the application code.
+- `src/pages/` contains the routed pages (login, dashboard).
+- `src/components/` contains the dialogs and tables the pages use.
+- `src/lib/` contains the API clients, polling and input helpers.
 - `src/styles/` contains global styling and foundation tokens.
 - `docs/` contains implementation notes and design decisions.
+- `Dockerfile` and `nginx.conf` build the static bundle and serve it in docker compose.
 
 ## Working rules
 
 - Keep new features small and explicit.
 - Prefer transport-agnostic interfaces near the domain boundary.
 - Add a short document whenever a new cross-cutting decision is introduced.
-
-## Current iteration status
-
-This iteration adds a login page design plus a sign-up POST request wired to the backend host from `envs/.env`. It intentionally does not include sign-in endpoint wiring, auth logic, or contract handling yet.

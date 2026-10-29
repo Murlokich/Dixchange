@@ -12,3 +12,6 @@
 
 `make test-e2e` loads `tests/e2e.env`, `app/e2e.env` and `app/.env`; the first file that sets
 a variable wins.
+
+The frontend has its own environment file, `frontend/envs/.env`; see
+[frontend/README.md](../frontend/README.md).
