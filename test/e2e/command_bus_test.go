@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 )
 
 // The command bus admits a command only while it has room for it, before anything is

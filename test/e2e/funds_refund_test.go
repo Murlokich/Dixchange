@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 )
 
 // An incoming order trades at the resting order's price. A bid reserves quantity * its own

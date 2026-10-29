@@ -3,9 +3,9 @@ package deposit_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
-	"github.com/dixchange/Monolith/internal/market/service"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/deposit"
+	"github.com/Murlokich/Dixchange/internal/market/service"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"

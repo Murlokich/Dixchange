@@ -3,8 +3,8 @@ package getmarketdata_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	getmarketdata "github.com/Murlokich/Dixchange/internal/domain/usecase/get_market_data"
 	"github.com/stretchr/testify/require"
 )
 

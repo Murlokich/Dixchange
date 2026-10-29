@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/config"
+	"github.com/Murlokich/Dixchange/internal/config"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/require"
 )

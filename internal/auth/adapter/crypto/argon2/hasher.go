@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dixchange/Monolith/internal/config"
+	"github.com/Murlokich/Dixchange/internal/config"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/argon2"
 )

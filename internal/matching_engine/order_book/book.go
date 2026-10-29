@@ -4,8 +4,8 @@ import (
 	"container/list"
 	"fmt"
 
-	"github.com/dixchange/Monolith/internal/config"
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/config"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	"github.com/google/btree"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

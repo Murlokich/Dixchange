@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 )
 
 // An order with enough funds reserves what it may spend right away, in the request, and

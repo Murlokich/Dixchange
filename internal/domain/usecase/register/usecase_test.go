@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/register"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

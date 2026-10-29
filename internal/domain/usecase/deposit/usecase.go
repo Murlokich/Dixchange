@@ -3,7 +3,7 @@ package deposit
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"

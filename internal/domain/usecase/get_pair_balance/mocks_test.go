@@ -7,7 +7,7 @@ package getpairbalance
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )

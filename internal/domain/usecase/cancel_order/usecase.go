@@ -4,8 +4,8 @@ import (
 	"context"
 	stdErrors "errors"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/dixchange/Monolith/pkg"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/pkg"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )

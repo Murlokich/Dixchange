@@ -1,6 +1,6 @@
 package getorders
 
-import "github.com/dixchange/Monolith/internal/domain/entity"
+import "github.com/Murlokich/Dixchange/internal/domain/entity"
 
 type Output struct {
 	// Orders carry their full market pair so amounts can be formatted at its precisions.

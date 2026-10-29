@@ -7,7 +7,7 @@ package deposit
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	mock "github.com/stretchr/testify/mock"

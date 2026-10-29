@@ -3,8 +3,8 @@ package getpairbalance_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	getpairbalance "github.com/Murlokich/Dixchange/internal/domain/usecase/get_pair_balance"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"

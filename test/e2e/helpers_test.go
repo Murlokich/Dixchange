@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
-	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
-	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
-	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
-	"github.com/dixchange/Monolith/internal/domain/usecase/register"
+	cancelorder "github.com/Murlokich/Dixchange/internal/domain/usecase/cancel_order"
+	createorder "github.com/Murlokich/Dixchange/internal/domain/usecase/create_order"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/deposit"
+	getpairbalance "github.com/Murlokich/Dixchange/internal/domain/usecase/get_pair_balance"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/register"
 )
 
 const (

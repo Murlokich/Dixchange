@@ -3,7 +3,7 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/utils"
+	"github.com/Murlokich/Dixchange/internal/utils"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"

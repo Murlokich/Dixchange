@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	eventbus "github.com/dixchange/Monolith/internal/matching_engine/event_bus"
-	"github.com/dixchange/Monolith/pkg"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	eventbus "github.com/Murlokich/Dixchange/internal/matching_engine/event_bus"
+	"github.com/Murlokich/Dixchange/pkg"
 	"github.com/google/uuid"
 	pkgerrors "github.com/pkg/errors"
 )

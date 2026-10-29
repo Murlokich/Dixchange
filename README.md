@@ -1,17 +1,18 @@
-# Monolith
+# Dixchange
 
-[![CI](https://github.com/dixchange/Monolith/actions/workflows/initial.yml/badge.svg?branch=main)](https://github.com/dixchange/Monolith/actions/workflows/initial.yml)
+[![CI](https://github.com/Murlokich/Dixchange/actions/workflows/initial.yml/badge.svg?branch=main)](https://github.com/Murlokich/Dixchange/actions/workflows/initial.yml)
 
 ## What it is
 
 The backend of an exchange-style trading platform, written in Go with PostgreSQL. Users deposit
 funds and place limit orders. A single-threaded in-memory matching engine matches the orders,
 and a settlement service records the trades and moves the balances in the database. After a
-crash the app restarts and rebuilds the order book from the database. The web UI is in a
-separate repository: [dixchange/Frontend](https://github.com/dixchange/Frontend).
+crash the app restarts and rebuilds the order book from the database. The web UI, a React
+app, is in [frontend/](frontend/) (see [frontend/README.md](frontend/README.md)); the rest
+of the repository is the backend.
 
 Stack: Go 1.26, Gin, PostgreSQL 18, pgx + sqlc, golang-migrate, google/btree,
-testcontainers.
+testcontainers. Frontend: React 19, TypeScript, Vite.
 
 ## Architecture
 
@@ -107,7 +108,7 @@ reached the engine; that doesn't affect correctness for the same reason.
 ## Running locally
 
 Prerequisites: Docker (with Compose), OpenSSL, and Go 1.26 (Go is needed for the tests, not
-for running the app).
+for running the app; Node.js 24 only for frontend development).
 
 1. Create the app's environment file `envs/app/.env` from `envs/app/.env.example`, with a
    freshly generated RSA key pair for signing the JWTs (stored as base64-encoded PEM in
@@ -117,19 +118,24 @@ for running the app).
    make env
    ```
 
-2. Start PostgreSQL and the app (migrations run on startup):
+2. Create the frontend's environment file and point it at the backend: copy
+   `frontend/envs/.env.example` to `frontend/envs/.env` and set
+   `VITE_BACKEND_HOST=http://localhost:8080`.
+
+3. Start PostgreSQL, the app (migrations run on startup) and the frontend:
 
    ```sh
    make up
    ```
 
-3. Check that it is up:
+4. Check that the backend is up, then open the UI at http://localhost:5173:
 
    ```sh
    curl http://localhost:8080/ping   # "pong"
    ```
 
-`make down` stops everything. The other settings (buffer sizes, Argon2 parameters, the
+`make down` stops everything. The frontend's settings are built into its image, so after
+changing `frontend/envs/.env` run `make rebuild-up`. The other settings (buffer sizes, Argon2 parameters, the
 frontend origin allowed by CORS, ...) have defaults; see `internal/config/config.go`. The
 environment files are described in [envs/README.md](envs/README.md).
 
@@ -185,3 +191,5 @@ header. Passwords are hashed with Argon2id and a random salt per password.
   constraints on lot size and price tick that keep every order's cost an integer.
 - [tests.md](tests.md): unit and end-to-end tests, and the e2e test cases.
 - [envs/README.md](envs/README.md): the environment files.
+- [frontend/README.md](frontend/README.md): the web UI, its configuration and how to run it;
+  design decisions in [frontend/docs/frontend-foundation.md](frontend/docs/frontend-foundation.md).

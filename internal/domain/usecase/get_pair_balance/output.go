@@ -1,6 +1,6 @@
 package getpairbalance
 
-import "github.com/dixchange/Monolith/internal/domain/entity"
+import "github.com/Murlokich/Dixchange/internal/domain/entity"
 
 type Output struct {
 	// Pair is returned alongside the balances so amounts can be formatted at the symbol precisions.

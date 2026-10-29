@@ -3,8 +3,8 @@ package createorder_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	createorder "github.com/Murlokich/Dixchange/internal/domain/usecase/create_order"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
