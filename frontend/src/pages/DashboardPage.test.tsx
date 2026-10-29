@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
@@ -578,5 +578,112 @@ describe('DashboardPage trade history', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /retry/i }));
     await within(dialog).findByText('14.00');
     expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('DashboardPage cancel order', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const openOrderId = '01a0cdca-9934-71a2-9983-73541b0e6921';
+  const cancelUrl = `${host}/api/orders/${openOrderId}/cancel`;
+
+  const mockCancelBackend = (cancelResponse: Response) =>
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === `${host}/api/market/pairs`) {
+        return jsonResponse(pairsResponse);
+      }
+      if (url === ordersUrl) {
+        return jsonResponse(ordersResponse);
+      }
+      if (url === tradesUrl) {
+        return jsonResponse(tradesResponse);
+      }
+      if (url.endsWith('/cancel')) {
+        return cancelResponse;
+      }
+      return jsonResponse(balanceResponses[1]);
+    });
+
+  const findOrderRows = async () => {
+    const section = screen.getByRole('region', { name: /open orders/i });
+    const table = await within(section).findByRole('table');
+    return within(table).getAllByRole('row').slice(1);
+  };
+
+  it('asks for confirmation, then cancels and refreshes orders and balance', async () => {
+    const fetchSpy = mockCancelBackend(jsonResponse({}));
+
+    render(<DashboardPage />);
+    const [row] = await findOrderRows();
+    await screen.findByText('8.00');
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
+    expect(fetchSpy).not.toHaveBeenCalledWith(cancelUrl, expect.anything());
+
+    const countCalls = (match: (url: string) => boolean) =>
+      fetchSpy.mock.calls.filter(([url]) => match(String(url))).length;
+    const ordersBefore = countCalls((url) => url === ordersUrl);
+    const balanceBefore = countCalls((url) => url.endsWith('/api/balance/1'));
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(cancelUrl, {
+        method: 'POST',
+        credentials: 'include',
+      }),
+    );
+    await waitFor(() => {
+      expect(countCalls((url) => url === ordersUrl)).toBeGreaterThan(ordersBefore);
+      expect(countCalls((url) => url.endsWith('/api/balance/1'))).toBeGreaterThan(balanceBefore);
+    });
+  });
+
+  it('says how much is left when cancelling a partially filled order', async () => {
+    mockCancelBackend(jsonResponse({}));
+
+    render(<DashboardPage />);
+    const rows = await findOrderRows();
+
+    fireEvent.click(within(rows[1]).getByRole('button', { name: 'Cancel' }));
+    expect(within(rows[1]).getByRole('button', { name: 'Cancel 4.50 left' })).toBeTruthy();
+  });
+
+  it('reverts the confirmation after a few seconds without a second click', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchSpy = mockCancelBackend(jsonResponse({}));
+
+    try {
+      render(<DashboardPage />);
+      const [row] = await findOrderRows();
+
+      fireEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
+      expect(within(row).getByRole('button', { name: 'Confirm' })).toBeTruthy();
+
+      await act(() => vi.advanceTimersByTimeAsync(3000));
+      expect(within(row).getByRole('button', { name: 'Cancel' })).toBeTruthy();
+      expect(fetchSpy).not.toHaveBeenCalledWith(cancelUrl, expect.anything());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the error in the row when the backend rejects the cancel', async () => {
+    mockCancelBackend({ ok: false, status: 409 } as Response);
+
+    render(<DashboardPage />);
+    const [row] = await findOrderRows();
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Confirm' }));
+
+    expect(await within(row).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Cancel failed with status 409',
+    );
+    expect(within(row).getByRole('button', { name: 'Cancel' })).toBeTruthy();
   });
 });

@@ -61,6 +61,20 @@ export async function createOrder(order: CreateOrderRequest): Promise<void> {
   }
 }
 
+export async function cancelOrder(orderId: string): Promise<void> {
+  const response = await fetch(
+    `${getBackendHost()}${ordersPath}/${encodeURIComponent(orderId)}/cancel`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Cancel failed with status ${response.status}`);
+  }
+}
+
 export function formatOrderTime(timestamp: string) {
   return new Date(timestamp).toLocaleString(undefined, {
     month: 'short',
