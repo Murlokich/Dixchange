@@ -3,8 +3,8 @@ package deposit
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/dixchange/Monolith/internal/utils"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/utils"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

@@ -1,6 +1,6 @@
 package orderbook
 
-import "github.com/dixchange/Monolith/internal/domain/entity"
+import "github.com/Murlokich/Dixchange/internal/domain/entity"
 
 type Trade struct {
 	Ask      entity.TradeParty

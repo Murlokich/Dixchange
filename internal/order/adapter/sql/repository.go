@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	"github.com/dixchange/Monolith/pkg"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/pkg"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"

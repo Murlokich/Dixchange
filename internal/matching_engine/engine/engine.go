@@ -5,10 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	commandbus "github.com/dixchange/Monolith/internal/matching_engine/command_bus"
-	orderbook "github.com/dixchange/Monolith/internal/matching_engine/order_book"
-	"github.com/dixchange/Monolith/pkg"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	commandbus "github.com/Murlokich/Dixchange/internal/matching_engine/command_bus"
+	orderbook "github.com/Murlokich/Dixchange/internal/matching_engine/order_book"
+	"github.com/Murlokich/Dixchange/pkg"
 	"github.com/google/uuid"
 )
 

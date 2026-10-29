@@ -7,7 +7,7 @@ package register
 import (
 	"context"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	mock "github.com/stretchr/testify/mock"
 )
 

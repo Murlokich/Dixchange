@@ -23,7 +23,7 @@ import (
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
-	"github.com/dixchange/Monolith/internal/config"
+	"github.com/Murlokich/Dixchange/internal/config"
 )
 
 // migrationsURL is relative to this package: go test runs with the package directory as

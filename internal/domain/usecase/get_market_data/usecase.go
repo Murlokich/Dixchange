@@ -6,7 +6,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 )
 
 type MarketRepository interface {

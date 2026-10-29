@@ -6,7 +6,7 @@ import (
 
 	"crypto/rsa"
 
-	"github.com/dixchange/Monolith/internal/config"
+	"github.com/Murlokich/Dixchange/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

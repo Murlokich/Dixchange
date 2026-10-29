@@ -1,6 +1,6 @@
 # Monolith
 
-[![CI](https://github.com/dixchange/Monolith/actions/workflows/initial.yml/badge.svg?branch=main)](https://github.com/dixchange/Monolith/actions/workflows/initial.yml)
+[![CI](https://github.com/Murlokich/Dixchange/actions/workflows/initial.yml/badge.svg?branch=main)](https://github.com/Murlokich/Dixchange/actions/workflows/initial.yml)
 
 ## What it is
 

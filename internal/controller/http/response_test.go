@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	gettrades "github.com/Murlokich/Dixchange/internal/domain/usecase/get_trades"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

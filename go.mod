@@ -1,4 +1,4 @@
-module github.com/dixchange/Monolith
+module github.com/Murlokich/Dixchange
 
 go 1.26.0
 

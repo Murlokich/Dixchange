@@ -3,7 +3,7 @@ package entity_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
 	"github.com/stretchr/testify/require"
 )
 

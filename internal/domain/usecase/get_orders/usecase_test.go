@@ -3,8 +3,8 @@ package getorders_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	getorders "github.com/Murlokich/Dixchange/internal/domain/usecase/get_orders"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"

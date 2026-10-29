@@ -4,16 +4,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	cancelorder "github.com/dixchange/Monolith/internal/domain/usecase/cancel_order"
-	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
-	"github.com/dixchange/Monolith/internal/domain/usecase/deposit"
-	getmarketdata "github.com/dixchange/Monolith/internal/domain/usecase/get_market_data"
-	getorders "github.com/dixchange/Monolith/internal/domain/usecase/get_orders"
-	getpairbalance "github.com/dixchange/Monolith/internal/domain/usecase/get_pair_balance"
-	gettrades "github.com/dixchange/Monolith/internal/domain/usecase/get_trades"
-	"github.com/dixchange/Monolith/internal/domain/usecase/login"
-	"github.com/dixchange/Monolith/internal/domain/usecase/register"
-	"github.com/dixchange/Monolith/pkg"
+	cancelorder "github.com/Murlokich/Dixchange/internal/domain/usecase/cancel_order"
+	createorder "github.com/Murlokich/Dixchange/internal/domain/usecase/create_order"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/deposit"
+	getmarketdata "github.com/Murlokich/Dixchange/internal/domain/usecase/get_market_data"
+	getorders "github.com/Murlokich/Dixchange/internal/domain/usecase/get_orders"
+	getpairbalance "github.com/Murlokich/Dixchange/internal/domain/usecase/get_pair_balance"
+	gettrades "github.com/Murlokich/Dixchange/internal/domain/usecase/get_trades"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/login"
+	"github.com/Murlokich/Dixchange/internal/domain/usecase/register"
+	"github.com/Murlokich/Dixchange/pkg"
 )
 
 type Handler func(c *gin.Context, deps *Dependencies)

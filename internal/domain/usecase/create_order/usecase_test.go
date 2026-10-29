@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/domain/entity"
-	createorder "github.com/dixchange/Monolith/internal/domain/usecase/create_order"
-	"github.com/dixchange/Monolith/pkg"
+	"github.com/Murlokich/Dixchange/internal/domain/entity"
+	createorder "github.com/Murlokich/Dixchange/internal/domain/usecase/create_order"
+	"github.com/Murlokich/Dixchange/pkg"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"

@@ -3,8 +3,8 @@ package jwt_test
 import (
 	"testing"
 
-	"github.com/dixchange/Monolith/internal/auth/adapter/jwt"
-	"github.com/dixchange/Monolith/internal/config"
+	"github.com/Murlokich/Dixchange/internal/auth/adapter/jwt"
+	"github.com/Murlokich/Dixchange/internal/config"
 	jwtlib "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

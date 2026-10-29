@@ -22,7 +22,7 @@ require-template-schema-exists: true
 template: testify
 template-schema: '{{.Template}}.schema.json'
 packages:
-  github.com/dixchange/Monolith/internal/domain/usecase:
+  github.com/Murlokich/Dixchange/internal/domain/usecase:
     config:
       all: true
       recursive: true
