@@ -1,28 +1,27 @@
-package skiplist_test
+package ds_test
 
 import (
 	"maps"
 	"slices"
 	"testing"
 
-	"github.com/Murlokich/Dixchange/ds/skiplist"
 	"github.com/stretchr/testify/require"
 )
 
 // All keys used by the sequences lie in [0, maxKey]; check also reads the keys just outside.
 const maxKey = 41
 
-// sequence keeps a plain Go map next to the skip list and checks after every step that the
-// skip list holds exactly the same keys and values.
+// sequence keeps a plain Go map next to the map under test and checks after every step that
+// both hold exactly the same keys and values.
 type sequence struct {
 	t   *testing.T
-	m   *skiplist.SkipList[int64, string]
+	m   orderedMap
 	ref map[int64]string
 }
 
-func newSequence(t *testing.T, asc bool) *sequence {
+func newSequence(t *testing.T, create func() orderedMap) *sequence {
 	t.Helper()
-	s := &sequence{t: t, m: newSkipList(asc), ref: map[int64]string{}}
+	s := &sequence{t: t, m: create(), ref: map[int64]string{}}
 	s.check()
 	return s
 }
@@ -85,9 +84,9 @@ func (s *sequence) check() {
 
 // Fill with 20 keys in mixed order, drain to empty in another order, then use the map again.
 func TestSequence_FillAndDrain(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			s := newSequence(t, order.asc)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			s := newSequence(t, impl.create)
 			s.putAll(7, 15, 2, 19, 11, 4, 18, 1, 13, 9, 20, 6, 16, 3, 12, 8, 17, 5, 14, 10)
 			s.deleteAll(11, 1, 20, 7, 15, 2, 19, 4, 18, 13, 9, 6, 16, 3, 12, 8, 17, 5, 14, 10)
 			s.putAll(12, 3, 30)
@@ -98,9 +97,9 @@ func TestSequence_FillAndDrain(t *testing.T) {
 // Order book style: 20 price levels, the levels at both ends are consumed and new ones appear
 // beyond the ends and in the gaps.
 func TestSequence_BestLevelChurn(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			s := newSequence(t, order.asc)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			s := newSequence(t, impl.create)
 			s.putAll(20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39)
 
 			s.deleteAll(20, 21, 22)  // lowest levels consumed
@@ -119,9 +118,9 @@ func TestSequence_BestLevelChurn(t *testing.T) {
 
 // Overwrites and deletes of missing keys must not change anything else.
 func TestSequence_ReplaceAndMissing(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			s := newSequence(t, order.asc)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			s := newSequence(t, impl.create)
 			s.putAll(19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 			for key := int64(0); key < 20; key += 3 {

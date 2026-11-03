@@ -1,4 +1,4 @@
-package skiplist_test
+package ds_test
 
 import (
 	"math/rand/v2"
@@ -6,29 +6,41 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/Murlokich/Dixchange/ds"
+	"github.com/Murlokich/Dixchange/ds/rbtree"
 	"github.com/Murlokich/Dixchange/ds/skiplist"
 	"github.com/stretchr/testify/require"
 )
 
+// orderedMap is the interface under test, instantiated as the order book uses it.
+type orderedMap = ds.OrderedMap[int64, string]
+
 const (
-	testMaxLevel = 4
-	testSeed     = 1
+	skipListMaxLevel = 4
+	skipListSeed     = 1
 )
 
-// Every test runs on both orders of the list: the head end differs, so "first" and "last"
-// mean different keys.
+// Every test runs on each implementation. The skip list runs in both orders, since its head
+// end differs: "first" and "last" mean different keys.
 //
 //nolint:gochecknoglobals // acceptable in test
-var orders = []struct {
-	name string
-	asc  bool
+var implementations = []struct {
+	name   string
+	create func() orderedMap
 }{
-	{name: "ascending", asc: true},
-	{name: "descending", asc: false},
+	{name: "skiplist ascending", create: func() orderedMap {
+		return skiplist.New[int64, string](skipListMaxLevel, skipListSeed, true)
+	}},
+	{name: "skiplist descending", create: func() orderedMap {
+		return skiplist.New[int64, string](skipListMaxLevel, skipListSeed, false)
+	}},
+	{name: "rbtree", create: func() orderedMap {
+		return rbtree.New[int64, string]()
+	}},
 }
 
-func newSkipList(asc bool, keys ...int64) *skiplist.SkipList[int64, string] {
-	m := skiplist.New[int64, string](testMaxLevel, testSeed, asc)
+func newMap(create func() orderedMap, keys ...int64) orderedMap {
+	m := create()
 	for _, key := range keys {
 		m.Put(key, value(key))
 	}
@@ -40,10 +52,10 @@ func value(key int64) string {
 }
 
 func TestLen(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			require.Equal(t, 0, newSkipList(order.asc).Len())
-			require.Equal(t, 3, newSkipList(order.asc, 20, 10, 30).Len())
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			require.Equal(t, 0, newMap(impl.create).Len())
+			require.Equal(t, 3, newMap(impl.create, 20, 10, 30).Len())
 		})
 	}
 }
@@ -61,9 +73,9 @@ func TestGet(t *testing.T) {
 		{name: "missing, between keys", key: 15, wantOK: false},
 		{name: "missing, above all keys", key: 35, wantOK: false},
 	}
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			m := newSkipList(order.asc, 20, 10, 30)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			m := newMap(impl.create, 20, 10, 30)
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
 					got, ok := m.Get(tt.key)
@@ -80,9 +92,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestGet_Empty(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			_, ok := newSkipList(order.asc).Get(10)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			_, ok := newMap(impl.create).Get(10)
 			require.False(t, ok)
 		})
 	}
@@ -99,11 +111,11 @@ func TestPut_NewKey(t *testing.T) {
 		{name: "between keys", keys: []int64{10, 20, 30}, key: 15},
 		{name: "above all keys", keys: []int64{10, 20, 30}, key: 35},
 	}
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					m := newSkipList(order.asc, tt.keys...)
+					m := newMap(impl.create, tt.keys...)
 
 					m.Put(tt.key, value(tt.key))
 
@@ -120,9 +132,9 @@ func TestPut_NewKey(t *testing.T) {
 }
 
 func TestPut_ExistingKey(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			m := newSkipList(order.asc, 10, 20, 30)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			m := newMap(impl.create, 10, 20, 30)
 
 			m.Put(20, "replaced")
 
@@ -146,11 +158,11 @@ func TestDelete(t *testing.T) {
 		{name: "missing key", key: 15, wantOK: false},
 	}
 	keys := []int64{10, 20, 30}
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					m := newSkipList(order.asc, keys...)
+					m := newMap(impl.create, keys...)
 
 					require.Equal(t, tt.wantOK, m.Delete(tt.key))
 
@@ -175,9 +187,9 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDelete_Empty(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			m := newSkipList(order.asc)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			m := newMap(impl.create)
 			require.False(t, m.Delete(10))
 			require.Equal(t, 0, m.Len())
 		})
@@ -185,9 +197,9 @@ func TestDelete_Empty(t *testing.T) {
 }
 
 func TestMinMax(t *testing.T) {
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
-			m := newSkipList(order.asc)
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			m := newMap(impl.create)
 			_, _, ok := m.Min()
 			require.False(t, ok, "min of empty")
 			_, _, ok = m.Max()
@@ -215,7 +227,7 @@ func TestMinMax(t *testing.T) {
 	}
 }
 
-func requireMinMax(t *testing.T, m *skiplist.SkipList[int64, string], wantMin, wantMax int64) {
+func requireMinMax(t *testing.T, m orderedMap, wantMin, wantMax int64) {
 	t.Helper()
 	key, val, ok := m.Min()
 	require.True(t, ok)
@@ -227,13 +239,14 @@ func requireMinMax(t *testing.T, m *skiplist.SkipList[int64, string], wantMin, w
 	require.Equal(t, value(wantMax), val)
 }
 
-// With a few keys most towers have height 1; enough keys use all the levels.
+// With a few keys the structures stay shallow; enough keys use all the skip list levels and
+// make the tree rebalance.
 func TestManyKeys(t *testing.T) {
 	const n = 1000
-	for _, order := range orders {
-		t.Run(order.name, func(t *testing.T) {
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
 			keys := rand.New(rand.NewPCG(1, 2)).Perm(n)
-			m := newSkipList(order.asc)
+			m := newMap(impl.create)
 			for _, key := range keys {
 				m.Put(int64(key), value(int64(key)))
 			}
