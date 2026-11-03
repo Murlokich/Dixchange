@@ -1,4 +1,4 @@
-.PHONY: help fmt env test test-e2e gen lint infra-up rebuild-up up down
+.PHONY: help fmt env test test-e2e fuzz fuzz-steps fuzz-replay gen lint infra-up rebuild-up up down
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -36,6 +36,21 @@ E2E_ENV_FILES = envs/tests/e2e.env,envs/app/e2e.env,$(E2E_APP_ENV)
 test-e2e: ## Run e2e tests (needs Docker)
 	@go tool godotenv -f $(E2E_ENV_FILES) \
 		go tool gotestsum --format testname -- -tags e2e -count=1 ./test/e2e/...
+
+# Fuzzing of the ordered maps in ds (see FuzzOrderedMap in ds/fuzz_test.go). A failing input is
+# saved to ds/testdata/fuzz/FuzzOrderedMap/<CASE>; plain make test runs it again.
+FUZZ_TIME ?= 60s
+
+fuzz: ## Fuzz the ordered maps in ds for FUZZ_TIME (default 60s)
+	@go test ./ds -run='^$$' -fuzz=FuzzOrderedMap -fuzztime=$(FUZZ_TIME)
+
+fuzz-steps: ## Print the operations of a saved fuzz input: make fuzz-steps CASE=<hash>
+	@test -n "$(CASE)" || { echo "usage: make fuzz-steps CASE=<hash>"; exit 1; }
+	@go test ./ds -run='FuzzOrderedMap/$(CASE)' -count=1 -v -steps
+
+fuzz-replay: ## Run one saved fuzz input against all the ordered maps: make fuzz-replay CASE=<hash>
+	@test -n "$(CASE)" || { echo "usage: make fuzz-replay CASE=<hash>"; exit 1; }
+	@go test ./ds -run='FuzzOrderedMap/$(CASE)' -count=1 -v
 
 gen: ## Generate code: sqlc
 	@sqlc generate
