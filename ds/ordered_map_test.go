@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Murlokich/Dixchange/ds"
+	"github.com/Murlokich/Dixchange/ds/array"
 	"github.com/Murlokich/Dixchange/ds/avltree"
 	"github.com/Murlokich/Dixchange/ds/btree"
 	"github.com/Murlokich/Dixchange/ds/rbtree"
@@ -20,6 +21,9 @@ type orderedMap = ds.OrderedMap[int64, string]
 const (
 	skipListMaxLevel = 4
 	skipListSeed     = 1
+	// covers every key the tests put; 1001 slots, so the last word of the bitset is partial
+	arrayMinKey = 0
+	arrayMaxKey = 1000
 )
 
 // Every test runs on each implementation. The skip list runs in both orders, since its head
@@ -47,6 +51,9 @@ var implementations = []struct {
 	}},
 	{name: "btree t=8", create: func() orderedMap {
 		return btree.New[int64, string](8)
+	}},
+	{name: "array", create: func() orderedMap {
+		return array.New[string](arrayMinKey, arrayMaxKey, 1)
 	}},
 }
 
