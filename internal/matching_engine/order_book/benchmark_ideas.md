@@ -60,6 +60,23 @@ number of indirect calls per operation.
   methods are wrappers that dispatch again). Estimated ~1-2 ns per operation, constant across
   structures, but it shrinks relative gaps in microbenchmarks of cheap operations.
 
+## Variants to measure
+
+Choices made for the first version of each structure in `ds/`, with the alternative to
+benchmark against.
+
+- **Skip list, tower allocation.** Now: the tower is a separate slice, so 2 allocations per
+  node. Variant: a fixed `[maxLevel]*node` array inside the node, so 1 allocation but
+  `maxLevel` pointers on every node.
+- **Skip list, order of the bid side.** Now: the bid side is built descending (`asc = false`),
+  so the best price sits at the cheap head end. Variant: ascending + tail pointer for both
+  sides, to measure how much the head/tail asymmetry costs.
+- **B-tree, search inside a node.** Now: linear scan (as Rust's `BTreeMap`; branch-predictable,
+  streams through the keys). Variant: binary search (as `google/btree`). Expected to interact
+  with the degree: linear should win for small nodes, binary for large ones.
+- **B-tree, degree.** Sweep the minimum degree t = 2, 4, 8, 16, 32, 64. t = 2 is a 2-3-4 tree,
+  equivalent to a red-black tree.
+
 ## How to measure
 
 - `go test -bench -benchmem -count=N` + `benchstat` for time and allocs per op.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Murlokich/Dixchange/ds"
 	"github.com/Murlokich/Dixchange/ds/avltree"
+	"github.com/Murlokich/Dixchange/ds/btree"
 	"github.com/Murlokich/Dixchange/ds/rbtree"
 	"github.com/Murlokich/Dixchange/ds/skiplist"
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,12 @@ var implementations = []struct {
 	}},
 	{name: "avltree", create: func() orderedMap {
 		return avltree.New[int64, string]()
+	}},
+	{name: "btree t=2", create: func() orderedMap {
+		return btree.New[int64, string](2)
+	}},
+	{name: "btree t=8", create: func() orderedMap {
+		return btree.New[int64, string](8)
 	}},
 }
 
