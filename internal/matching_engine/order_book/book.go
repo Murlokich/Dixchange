@@ -6,7 +6,6 @@ import (
 
 	"github.com/Murlokich/Dixchange/internal/config"
 	"github.com/Murlokich/Dixchange/internal/domain/entity"
-	"github.com/google/btree"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
@@ -88,8 +87,8 @@ func (b *Book) CancelOrder(id uuid.UUID) (bool, error) {
 func NewBook(cfg *config.OrderBook, pair entity.Pair) *Book {
 	return &Book{
 		pair:   pair,
-		asks:   &asks{btree.NewG[PriceLevel](cfg.B, less)},
-		bids:   &bids{btree.NewG[PriceLevel](cfg.B, less)},
+		asks:   newAsks(cfg.B),
+		bids:   newBids(cfg.B),
 		orders: make(map[uuid.UUID]deletableNode),
 	}
 }
