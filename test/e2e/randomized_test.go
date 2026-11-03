@@ -43,7 +43,7 @@ const (
 	randomShareBase   = 10
 )
 
-// randomSettings configures the suite; make test-e2e loads them from envs/tests/e2e.env.
+// randomSettings configures the suite; make e2e-test loads them from envs/tests/e2e.env.
 type randomSettings struct {
 	Users         int    `required:"true"`
 	Commands      int    `required:"true"`
@@ -71,7 +71,7 @@ func (s *randomSettings) Validate() error {
 func TestRandomized_Sequence(t *testing.T) {
 	var settings randomSettings
 	if err := envconfig.Process("e2e_random", &settings); err != nil {
-		t.Fatalf("read the settings (run the tests with make test-e2e): %v", err)
+		t.Fatalf("read the settings (run the tests with make e2e-test): %v", err)
 	}
 	if err := settings.Validate(); err != nil {
 		t.Fatalf("invalid settings: %v", err)

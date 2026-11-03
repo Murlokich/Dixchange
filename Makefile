@@ -1,7 +1,7 @@
-.PHONY: help fmt env test test-e2e fuzz fuzz-steps fuzz-replay gen lint infra-up rebuild-up up down
+.PHONY: help fmt env unit-test e2e-test fuzz fuzz-steps fuzz-replay gen lint infra-up rebuild-up up down
 
 help:  ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
@@ -24,21 +24,21 @@ env: ## Create envs/app/.env from .env.example with new JWT keys (never overwrit
 		echo "created $(ENV_FILE)"
 
 
-test: ## Run tests and display coverage
+unit-test: ## Run tests and display coverage
 	@go tool gotestsum --format pkgname --format-hide-empty-pkg -- -cover ./...
 
-# The env files test-e2e loads; the first listed file wins (godotenv): the tests' own
+# The env files e2e-test loads; the first listed file wins (godotenv): the tests' own
 # settings, then the app config the e2e tests run differently, then the app config itself.
-# CI has no envs/app/.env and passes its own: make test-e2e E2E_APP_ENV=...
+# CI has no envs/app/.env and passes its own: make e2e-test E2E_APP_ENV=...
 E2E_APP_ENV ?= envs/app/.env
 E2E_ENV_FILES = envs/tests/e2e.env,envs/app/e2e.env,$(E2E_APP_ENV)
 
-test-e2e: ## Run e2e tests (needs Docker)
+e2e-test: ## Run e2e tests (needs Docker)
 	@go tool godotenv -f $(E2E_ENV_FILES) \
 		go tool gotestsum --format testname -- -tags e2e -count=1 ./test/e2e/...
 
 # Fuzzing of the ordered maps in ds (see FuzzOrderedMap in ds/fuzz_test.go). A failing input is
-# saved to ds/testdata/fuzz/FuzzOrderedMap/<CASE>; plain make test runs it again.
+# saved to ds/testdata/fuzz/FuzzOrderedMap/<CASE>; plain make unit-test runs it again.
 FUZZ_TIME ?= 60s
 
 fuzz: ## Fuzz the ordered maps in ds for FUZZ_TIME (default 60s)

@@ -161,10 +161,10 @@ login, in an `Authorization: Bearer <token>` header or the `access_token` cookie
 ## Tests
 
 - **Unit tests** need only Go and cover the order book, domain entities, use cases (with
-  mocks) and HTTP mapping: `make test`.
+  mocks) and HTTP mapping: `make unit-test`.
 - **End-to-end tests** (`test/e2e`, needs Docker) run the real components wired as in
   `cmd/app.go` against PostgreSQL in a container, calling the use cases directly instead of
-  HTTP so they can control when the engine and settlement run: `make test-e2e`. They read
+  HTTP so they can control when the engine and settlement run: `make e2e-test`. They read
   `envs/app/.env` like the app does, so run `make env` first.
 
 Besides the scenario tests, a randomized suite sends a random sequence of orders and cancels

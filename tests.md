@@ -4,7 +4,7 @@ The project has two kinds of tests. They differ in what is real and what is repl
 
 | | Unit tests | End-to-end tests |
 |---|---|---|
-| Run with | `make test` (or `go test ./...`) | `make test-e2e` |
+| Run with | `make unit-test` (or `go test ./...`) | `make e2e-test` |
 | Needs | Go only | Go and Docker |
 | Database | none | real Postgres in a container |
 | Location | next to the code (`internal/**/*_test.go`) | `test/e2e/` |
