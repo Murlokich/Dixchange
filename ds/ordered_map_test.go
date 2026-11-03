@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Murlokich/Dixchange/ds"
+	"github.com/Murlokich/Dixchange/ds/avltree"
 	"github.com/Murlokich/Dixchange/ds/rbtree"
 	"github.com/Murlokich/Dixchange/ds/skiplist"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,9 @@ var implementations = []struct {
 	}},
 	{name: "rbtree", create: func() orderedMap {
 		return rbtree.New[int64, string]()
+	}},
+	{name: "avltree", create: func() orderedMap {
+		return avltree.New[int64, string]()
 	}},
 }
 
