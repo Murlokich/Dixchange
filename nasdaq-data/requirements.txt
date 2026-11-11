@@ -1,0 +1,6 @@
+itch-book==0.2.1
+numpy==2.5.4
+polars==2.1.0
+polars-runtime-32==2.1.0
+pyarrow==26.0.1
+tzdata==2026.6

@@ -41,3 +41,6 @@ test/e2e/out/
 # personal notes, kept out of the repository
 bugs.md
 recovery.md
+
+nasdaq-data/.venv/
+nasdaq-data/data/
